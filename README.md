@@ -94,7 +94,6 @@ romm-android/
 The app requires the following permissions:
 - `READ_EXTERNAL_STORAGE` - Access ROM files
 - `WRITE_EXTERNAL_STORAGE` - Download and save ROMs
-- `MANAGE_EXTERNAL_STORAGE` - Full file system access
 - `INTERNET` - Connect to RomM server
 
 ### RomM Server Compatibility
