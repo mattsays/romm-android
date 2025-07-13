@@ -1,50 +1,146 @@
-# Welcome to your Expo app 👋
+# RomM Android
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+<div align="center">
+  <img src="./assets/images/icon.png" alt="RomM Android Logo" width="128" height="128" />
+  
+  <p><strong>A React Native companion app for RomM - ROM Management made easy</strong></p>
+  
+  [![Expo](https://img.shields.io/badge/Expo-53.0.19-blue.svg)](https://expo.dev/)
+  [![React Native](https://img.shields.io/badge/React%20Native-0.79.5-green.svg)](https://reactnative.dev/)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-blue.svg)](https://www.typescriptlang.org/)
+</div>
 
-## Get started
+## 📱 About
 
-1. Install dependencies
+RomM Android is a mobile companion app for [RomM](https://github.com/rommapp/romm), a beautiful, powerful, self-hosted ROM manager. This app allows you to browse, manage, and organize your retro gaming collection directly from your Android device.
 
+### ✨ Features
+
+- 🎮 **Browse ROM Collections**: Explore your games organized by platform
+- 🔐 **Secure Authentication**: Login with your RomM server credentials
+- 📱 **Retrohandled-Optimized Interface**: Beautiful, responsive design built for retrohandleds
+- 📁 **File Management**: Download and manage ROM files on your device
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (version 18 or higher)
+- [Expo CLI](https://docs.expo.dev/get-started/installation/)
+- Android Studio (for Android development)
+- A running [RomM server](https://github.com/rommapp/romm)
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/mattsays/romm-android.git
+   cd romm-android
+   ```
+
+2. **Install dependencies**
    ```bash
    npm install
    ```
 
-2. Start the app
-
+3. **Start the development server**
    ```bash
-   npx expo start
+   npm start
    ```
 
-In the output, you'll find options to open the app in a
+4. **Run on Android**
+   ```bash
+   npm run android
+   ```
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 🔧 Development
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Project Structure
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+romm-android/
+├── app/                    # Expo Router pages
+│   ├── auth/              # Authentication screens
+│   ├── game/              # Game detail screens
+│   └── platform/          # Platform browsing screens
+├── components/            # Reusable React components
+├── contexts/              # React contexts (AuthContext)
+├── hooks/                 # Custom React hooks
+├── locales/               # Internationalization files
+├── services/              # API services and utilities
+└── assets/                # Images, fonts, and static assets
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Available Scripts
 
-## Learn more
+- `npm start` - Start the Expo development server
+- `npm run android` - Run on Android device/emulator
 
-To learn more about developing your project with Expo, look at the following resources:
+### Technology Stack
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- **Framework**: [Expo](https://expo.dev/) with Expo Router
+- **Language**: TypeScript
+- **UI**: React Native with custom components
+- **Navigation**: Expo Router (file-based routing)
+- **State Management**: React Context + Custom Hooks
+- **Storage**: Expo SecureStore for sensitive data
+- **HTTP Client**: Fetch API with custom wrapper
+- **Internationalization**: Custom i18n implementation
 
-## Join the community
+## 📋 Requirements
 
-Join our community of developers creating universal apps.
+### Android Permissions
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+The app requires the following permissions:
+- `READ_EXTERNAL_STORAGE` - Access ROM files
+- `WRITE_EXTERNAL_STORAGE` - Download and save ROMs
+- `MANAGE_EXTERNAL_STORAGE` - Full file system access
+- `INTERNET` - Connect to RomM server
+
+### RomM Server Compatibility
+
+This app is compatible with RomM API version 3.10.2 and above.
+
+## 🔒 Security
+
+- All authentication tokens are stored securely using Expo SecureStore
+- HTTPS connection to RomM server is recommended for production use
+- No sensitive data is logged or cached in plain text
+
+## 🤝 Contributing
+
+We welcome contributions! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+### Development Guidelines
+
+1. Follow the existing code style and TypeScript patterns
+2. Add appropriate types for all new code
+3. Test your changes on both Android devices and emulators
+4. Update documentation as needed
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🔗 Related Projects
+
+- [RomM](https://github.com/rommapp/romm) - The main RomM server application
+- [RomM Documentation](https://github.com/rommapp/romm/wiki) - Official documentation
+
+## 📞 Support
+
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/mattsays/romm-android/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/mattsays/romm-android/discussions)
+- 📖 **Documentation**: [Wiki](https://github.com/mattsays/romm-android/wiki)
+
+## 🙏 Acknowledgments
+
+- [RomM Team](https://github.com/rommapp/romm) for creating the amazing ROM management platform
+- [Expo Team](https://expo.dev/) for the excellent React Native development experience
+- The retro gaming community for inspiration and feedback
+
+---
+
+<div align="center">
+  <p>Made with ❤️ for the retro gaming community</p>
+</div>

@@ -1,0 +1,344 @@
+import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { PublicRoute } from '../../components/ProtectedRoute';
+import { useLogin } from '../../hooks/useAuth';
+import { LoginCredentials, apiClient } from '../../services/api';
+
+export default function LoginScreen() {
+    const [credentials, setCredentials] = useState<LoginCredentials>({
+        username: '',
+        password: '',
+    });
+    const [serverUrl, setServerUrl] = useState<string>('');
+    const [showUrlField, setShowUrlField] = useState<boolean>(false);
+    const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'failed'>('checking');
+    const { login, isLoading, error, clearError } = useLogin();
+    const router = useRouter();
+
+    // Load saved server URL on component mount
+    useEffect(() => {
+        const loadSavedUrl = async () => {
+            try {
+                const savedUrl = await SecureStore.getItemAsync('server_url');
+                if (savedUrl) {
+                    setServerUrl(savedUrl);
+                    apiClient.updateBaseUrl(savedUrl);
+                } else {
+                    setServerUrl(apiClient.baseUrl);
+                }
+            } catch (error) {
+                console.error('Failed to load saved URL:', error);
+                setServerUrl(apiClient.baseUrl);
+            }
+        };
+
+        loadSavedUrl();
+    }, []);
+
+    // Test connection on component mount and when URL changes
+    useEffect(() => {
+        const testConnection = async () => {
+            if (!serverUrl.trim()) return;
+
+            setConnectionStatus('checking');
+            try {
+                const isConnected = await apiClient.heartbeat();
+                setConnectionStatus(isConnected ? 'connected' : 'failed');
+            } catch (error) {
+                console.error('Connection test failed:', error);
+                setConnectionStatus('failed');
+            }
+        };
+
+        if (serverUrl) {
+            testConnection();
+        }
+    }, [serverUrl]);
+
+    const handleUrlChange = async (newUrl: string) => {
+        setServerUrl(newUrl);
+        if (newUrl.trim()) {
+            try {
+                apiClient.updateBaseUrl(newUrl);
+                await SecureStore.setItemAsync('server_url', newUrl);
+            } catch (error) {
+                console.error('Failed to save URL:', error);
+            }
+        }
+    };
+
+    const handleLogin = async () => {
+        if (!credentials.username.trim() || !credentials.password.trim()) {
+            Alert.alert('Errore', 'Inserisci username e password');
+            return;
+        }
+
+        try {
+            clearError();
+            await login(credentials);
+            router.replace('/');
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Errore durante il login';
+            Alert.alert('Errore di login', errorMessage);
+        }
+    };
+
+    return (
+        <PublicRoute>
+            <KeyboardAvoidingView
+                style={styles.container}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView contentContainerStyle={styles.scrollContainer}>
+                    <View style={styles.formContainer}>
+                        <Text style={styles.title}>RomM</Text>
+                        <Text style={styles.subtitle}>Accedi al tuo account</Text>
+
+                        {/* Connection Status */}
+                        <View style={styles.connectionStatus}>
+                            {connectionStatus === 'checking' && (
+                                <View style={styles.statusRow}>
+                                    <ActivityIndicator size="small" color="#007AFF" />
+                                    <Text style={styles.statusText}>Verifica connessione...</Text>
+                                </View>
+                            )}
+                            {connectionStatus === 'connected' && (
+                                <View style={styles.statusRow}>
+                                    <Text style={styles.statusIcon}>✓</Text>
+                                    <Text style={[styles.statusText, styles.successText]}>
+                                        Connesso al server RomM
+                                    </Text>
+                                </View>
+                            )}
+                            {connectionStatus === 'failed' && (
+                                <View style={styles.statusRow}>
+                                    <Text style={styles.statusIcon}>⚠️</Text>
+                                    <Text style={[styles.statusText, styles.errorText]}>
+                                        Impossibile connettersi al server
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Server URL Configuration */}
+                        <TouchableOpacity
+                            style={styles.urlToggleButton}
+                            onPress={() => setShowUrlField(!showUrlField)}
+                        >
+                            <Text style={styles.urlToggleText}>
+                                {showUrlField ? '▼' : '▶'} Configura URL Server
+                            </Text>
+                        </TouchableOpacity>
+
+                        {showUrlField && (
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>URL Server RomM</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={serverUrl}
+                                    onChangeText={handleUrlChange}
+                                    placeholder="http://localhost:8080"
+                                    placeholderTextColor="#666"
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    editable={!isLoading}
+                                    keyboardType="url"
+                                />
+                                <Text style={styles.urlHint}>
+                                    Inserisci l'URL completo del tuo server RomM (es: http://192.168.1.100:8080)
+                                </Text>
+                            </View>
+                        )}
+
+                        {error && (
+                            <View style={styles.errorContainer}>
+                                <Text style={styles.errorContainerText}>{error}</Text>
+                            </View>
+                        )}
+
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.label}>Username</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={credentials.username}
+                                onChangeText={(text) => setCredentials(prev => ({ ...prev, username: text }))}
+                                placeholder="Inserisci il tuo username"
+                                placeholderTextColor="#666"
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                editable={!isLoading}
+                            />
+                        </View>
+
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.label}>Password</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={credentials.password}
+                                onChangeText={(text) => setCredentials(prev => ({ ...prev, password: text }))}
+                                placeholder="Inserisci la tua password"
+                                placeholderTextColor="#666"
+                                secureTextEntry
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                editable={!isLoading}
+                            />
+                        </View>
+
+                        <TouchableOpacity
+                            style={[styles.loginButton, isLoading && styles.disabledButton]}
+                            onPress={handleLogin}
+                            disabled={isLoading}
+                        >
+                            {isLoading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.loginButtonText}>Accedi</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </PublicRoute>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#000',
+    },
+    scrollContainer: {
+        flexGrow: 1,
+        justifyContent: 'center',
+        padding: 20,
+    },
+    formContainer: {
+        width: '100%',
+        maxWidth: 400,
+        alignSelf: 'center',
+    },
+    title: {
+        fontSize: 48,
+        fontWeight: 'bold',
+        color: '#fff',
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    subtitle: {
+        fontSize: 18,
+        color: '#ccc',
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    connectionStatus: {
+        marginBottom: 20,
+        padding: 12,
+        borderRadius: 8,
+        backgroundColor: '#1a1a1a',
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    statusRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    statusIcon: {
+        fontSize: 16,
+        marginRight: 8,
+    },
+    statusText: {
+        fontSize: 14,
+        color: '#ccc',
+    },
+    successText: {
+        color: '#059669',
+    },
+    errorContainer: {
+        backgroundColor: '#dc2626',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 20,
+    },
+    errorContainerText: {
+        color: '#fff',
+        textAlign: 'center',
+        fontSize: 14,
+    },
+    errorText: {
+        color: '#dc2626',
+        textAlign: 'center',
+        fontSize: 14,
+    },
+    inputContainer: {
+        marginBottom: 20,
+    },
+    label: {
+        fontSize: 16,
+        color: '#fff',
+        marginBottom: 8,
+        fontWeight: '500',
+    },
+    input: {
+        backgroundColor: '#1a1a1a',
+        borderColor: '#333',
+        borderWidth: 1,
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        color: '#fff',
+    },
+    loginButton: {
+        backgroundColor: '#5f43b2',
+        borderRadius: 8,
+        padding: 16,
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    disabledButton: {
+        backgroundColor: '#666',
+    },
+    loginButtonText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '600',
+    },
+    forgotPasswordButton: {
+        alignItems: 'center',
+        padding: 8,
+    },
+    forgotPasswordText: {
+        color: '#5f43b2',
+        fontSize: 16,
+    },
+    urlToggleButton: {
+        alignItems: 'center',
+        padding: 12,
+        marginBottom: 10,
+    },
+    urlToggleText: {
+        color: '#5f43b2',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    urlHint: {
+        color: '#888',
+        fontSize: 12,
+        marginTop: 5,
+        fontStyle: 'italic',
+    },
+});
