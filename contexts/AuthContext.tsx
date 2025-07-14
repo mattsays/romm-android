@@ -36,9 +36,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const refreshUser = async () => {
         try {
             if (apiClient.isAuthenticated()) {
-                console.log('Fetcheing user data...');
                 const userData = await apiClient.getCurrentUser();
-                console.log('Fetched user data:', userData);
                 setUser(userData);
             } else {
                 setUser(null);

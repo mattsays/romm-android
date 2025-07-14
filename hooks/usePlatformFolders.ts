@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStorageAccessFramework } from './useStorageAccessFramework';
 
 export interface PlatformFolder {
@@ -10,56 +10,17 @@ export interface PlatformFolder {
 }
 
 export const usePlatformFolders = () => {
-    const [platformFolders, setPlatformFolders] = useState<Record<string, PlatformFolder>>({});
     const [loading, setLoading] = useState(true);
+    const [isReady, setIsReady] = useState(false);
     const { checkDirectoryPermissions } = useStorageAccessFramework();
 
     const STORAGE_KEY = 'platformFolders';
 
-    // Load platform folders from AsyncStorage when the hook is initialized
-    useEffect(() => {
-        loadPlatformFolders();
-    }, []);
+    // // Load platform folders from AsyncStorage when the hook is initialized
+    // useEffect(() => {
+    //     loadPlatformFolders()
+    // }, []);
 
-
-    const loadPlatformFolders = async () => {
-        try {
-            setLoading(true);
-            const savedFolders = await AsyncStorage.getItem(STORAGE_KEY);
-
-            if (savedFolders) {
-                const parsedFolders: Record<string, PlatformFolder> = JSON.parse(savedFolders);
-
-                // Check permissions for each folder
-                const validFolders: Record<string, PlatformFolder> = {};
-
-                for (const [platformSlug, folderData] of Object.entries(parsedFolders)) {
-                    try {
-                        const hasPermissions = await checkDirectoryPermissions(folderData.folderUri);
-                        if (hasPermissions) {
-                            validFolders[platformSlug] = folderData;
-                        } else {
-                            console.warn(`Permissions lost for platform ${platformSlug}`);
-                        }
-                    } catch (error) {
-                        console.warn(`Error checking permissions for platform ${platformSlug}:`, error);
-                    }
-                }
-
-                setPlatformFolders(validFolders);
-
-                // If the number of valid folders is different from the saved ones, update storage
-                if (Object.keys(validFolders).length !== Object.keys(parsedFolders).length) {
-                    await savePlatformFoldersToStorage(validFolders);
-                }
-            }
-        } catch (error) {
-            console.error('Error loading platform folders:', error);
-            setPlatformFolders({});
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const savePlatformFoldersToStorage = async (folders: Record<string, PlatformFolder>) => {
         try {
@@ -71,11 +32,12 @@ export const usePlatformFolders = () => {
     };
 
     // Function to save a folder for a specific platform
-    const savePlatformFolder = async (
+    const savePlatformFolder = async(
         platformSlug: string,
         platformName: string,
         folderUri: string
     ) => {
+
         try {
             const folderName = extractFolderNameFromUri(folderUri);
             const newFolder: PlatformFolder = {
@@ -85,29 +47,19 @@ export const usePlatformFolders = () => {
                 folderName
             };
 
-            const updatedFolders = {
-                ...platformFolders,
-                [platformSlug]: newFolder
-            };
-
-            await savePlatformFoldersToStorage(updatedFolders);
-            setPlatformFolders(updatedFolders);
+            await AsyncStorage.setItem(`${STORAGE_KEY}_${platformSlug}` , JSON.stringify(newFolder));
+            
             console.log(`Cartella per la piattaforma ${platformSlug} salvata con successo:`, newFolder);
-            console.log('Cartelle aggiornate:', updatedFolders);
         } catch (error) {
             console.error(`Errore nel salvare la cartella per la piattaforma ${platformSlug}:`, error);
             throw error;
-        }
+        } 
     };
 
     // Function to remove a platform folder
     const removePlatformFolder = async (platformSlug: string) => {
         try {
-            const updatedFolders = { ...platformFolders };
-            delete updatedFolders[platformSlug];
-
-            await savePlatformFoldersToStorage(updatedFolders);
-            setPlatformFolders(updatedFolders);
+            await AsyncStorage.removeItem(`${STORAGE_KEY}_${platformSlug}`);
         } catch (error) {
             console.error(`Errore nella rimozione della cartella per la piattaforma ${platformSlug}:`, error);
             throw error;
@@ -115,18 +67,20 @@ export const usePlatformFolders = () => {
     };
 
     // Function to get the folder for a specific platform
-    const getPlatformFolder = (platformSlug: string): PlatformFolder | null => {
-        return platformFolders[platformSlug] || null;
+    const getPlatformFolder = async (platformSlug: string): Promise<PlatformFolder | null> => {
+        const folder = await AsyncStorage.getItem(`${STORAGE_KEY}_${platformSlug}`);
+        return folder ? JSON.parse(folder) : null;
     };
 
     // Function to check if a platform has a configured folder
-    const hasPlatformFolder = (platformSlug: string): boolean => {
-        return !!platformFolders[platformSlug];
+    const hasPlatformFolder = async (platformSlug: string): Promise<boolean> => {
+        const folder = await getPlatformFolder(platformSlug);
+        return !!folder;
     };
 
     // Function to check if a platform's folder is still accessible
     const checkPlatformFolderAccess = async (platformSlug: string): Promise<boolean> => {
-        const folder = platformFolders[platformSlug];
+        const folder = await getPlatformFolder(platformSlug);
         if (!folder) {
             return false;
         }
@@ -156,32 +110,35 @@ export const usePlatformFolders = () => {
         }
     };
 
-    // Funzione per ottenere tutte le piattaforme configurate
-    const getAllConfiguredPlatforms = (): PlatformFolder[] => {
-        return Object.values(platformFolders);
-    };
+    // Funzione per attendere che i dati siano pronti
+    const waitForReady = (): Promise<void> => {
+        return new Promise((resolve) => {
+            if (isReady) {
+                resolve();
+                return;
+            }
 
-    // Funzione per pulire tutte le cartelle delle piattaforme
-    const clearAllPlatformFolders = async () => {
-        try {
-            await AsyncStorage.removeItem(STORAGE_KEY);
-            setPlatformFolders({});
-        } catch (error) {
-            console.error('Errore nella rimozione di tutte le cartelle delle piattaforme:', error);
-            throw error;
-        }
+            const checkReady = () => {
+                if (isReady) {
+                    resolve();
+                } else {
+                    setTimeout(checkReady, 50);
+                }
+            };
+
+            checkReady();
+        });
     };
 
     return {
-        platformFolders,
         loading,
-        loadPlatformFolders,
+        isReady,
+        // loadPlatformFolders,
         savePlatformFolder,
         removePlatformFolder,
         getPlatformFolder,
         hasPlatformFolder,
         checkPlatformFolderAccess,
-        getAllConfiguredPlatforms,
-        clearAllPlatformFolders,
+        waitForReady,
     };
 };

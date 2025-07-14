@@ -13,7 +13,10 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DownloadStatusBar } from '../components/DownloadStatusBar';
 import { ProtectedRoute } from '../components/ProtectedRoute';
+import { useDownload } from '../contexts/DownloadContext';
 import { useAuthCheck, useLogout } from '../hooks/useAuth';
 import { usePlatforms } from '../hooks/useRoms';
 import { useTranslation } from '../hooks/useTranslation';
@@ -27,6 +30,8 @@ export default function LibraryScreen() {
     const { user, username, isAuthenticated } = useAuthCheck();
     const { logout, isLoading: isLoggingOut } = useLogout();
     const [refreshing, setRefreshing] = useState(false);
+    const { activeDownloads } = useDownload();
+    const insets = useSafeAreaInsets();
 
     // Funzione per il refresh
     const onRefresh = async () => {
@@ -147,6 +152,19 @@ export default function LibraryScreen() {
                             </View>
                             <View style={styles.headerButtons}>
                                 <TouchableOpacity
+                                    style={[styles.headerButton, activeDownloads.length > 0 && styles.downloadButtonActive]}
+                                    onPress={() => router.push('/downloads')}
+                                >
+                                    <Ionicons name="download-outline" size={24} color="#fff" />
+                                    {activeDownloads.length > 0 && (
+                                        <View style={styles.downloadBadge}>
+                                            <Text style={styles.downloadBadgeText}>
+                                                {activeDownloads.length}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                                <TouchableOpacity
                                     style={styles.headerButton}
                                     onPress={() => router.push('/settings')}
                                 >
@@ -162,7 +180,7 @@ export default function LibraryScreen() {
                                     ) : (
                                         <Ionicons name="log-out-outline" size={24} color="#fff" />
                                     )}
-                                </TouchableOpacity>                            
+                                </TouchableOpacity>
                             </View>
                         </View>
                     </View>
@@ -183,7 +201,11 @@ export default function LibraryScreen() {
                             )}
                         </View>
                     </View>
+
+                    {/* Bottom padding per download status bar */}
+                    {activeDownloads.length > 0 && <View style={[styles.bottomPadding, { height: 80 + insets.bottom }]} />}
                 </ScrollView>
+                <DownloadStatusBar onPress={() => router.push('/downloads')} />
             </View>
         </ProtectedRoute>
     );
@@ -324,5 +346,27 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 12,
         fontWeight: '600',
+    },
+    downloadButtonActive: {
+        backgroundColor: '#007AFF',
+    },
+    downloadBadge: {
+        position: 'absolute',
+        top: 4,
+        right: 4,
+        backgroundColor: '#FF3B30',
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    downloadBadgeText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: 'bold',
+    },
+    bottomPadding: {
+        height: 80, // Sufficient height to avoid overlap with the download status bar
     },
 });

@@ -142,7 +142,6 @@ class ApiClient {
 
     private async saveSessionTokenToStorage(sessionToken: string): Promise<void> {
         try {
-            console.log('Saving token to storage:', sessionToken);
             await SecureStore.setItemAsync('session_token', sessionToken);
             this.sessionToken = sessionToken;
         } catch (error) {
@@ -183,8 +182,6 @@ class ApiClient {
             ...(options.headers as Record<string, string>),
         };
 
-        console.log('Request headers:', headers);
-
         try {
             const response = await fetch(url, {
                 ...options,
@@ -211,7 +208,6 @@ class ApiClient {
             }
 
             const data = await response.json();
-            console.log('API response data:', data);
             return data;
         } catch (error) {
             console.error('API request failed:', error);
@@ -220,7 +216,6 @@ class ApiClient {
     }
 
     private extractSessionTokenFromResponse(response: Response): string | null {
-        console.log("Headers from response:", response.headers);
         const setCookieHeader = response.headers.get('set-cookie');
         if (!setCookieHeader) return null;
 

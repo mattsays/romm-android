@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import ReactNativeBlobUtil from 'react-native-blob-util';
 import {
     ActivityIndicator,
     Alert,
@@ -14,7 +13,9 @@ import {
     View
 } from 'react-native';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
-import { PlatformFolder, usePlatformFolders } from '../../hooks/usePlatformFolders';
+import { useDownload } from '../../contexts/DownloadContext';
+import { usePlatformFolders } from '../../hooks/usePlatformFolders';
+import { useRomDownload } from '../../hooks/useRomDownload';
 import { apiClient, Rom } from '../../services/api';
 
 export default function GameDetailsScreen() {
@@ -22,35 +23,15 @@ export default function GameDetailsScreen() {
     const router = useRouter();
     const [rom, setRom] = useState<Rom | null>(null);
     const [loading, setLoading] = useState(true);
-    const [downloading, setDownloading] = useState(false);
-    const [downloadProgress, setDownloadProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [isAlreadyDownloaded, setIsAlreadyDownloaded] = useState(false);
     const [checkingExistingFile, setCheckingExistingFile] = useState(false);
     const [existingFilePath, setExistingFilePath] = useState<string | null>(null);
+    const { downloadRom, isRomDownloading } = useRomDownload();
+    const { getDownloadById } = useDownload();
     const {
-        getPlatformFolder,
-        hasPlatformFolder,
-        savePlatformFolder,
-        platformFolders
+        getPlatformFolder
     } = usePlatformFolders();
-
-    // Funzione per estrarre il nome della cartella dall'URI
-    const extractFolderNameFromUri = (uri: string): string => {
-        try {
-            const decodedUri = decodeURIComponent(uri);
-            const parts = decodedUri.split('/');
-            const lastPart = parts[parts.length - 1];
-
-            if (lastPart.includes('%3A')) {
-                return lastPart.split('%3A').pop() || 'Selected Folder';
-            }
-
-            return lastPart || 'Selected Folder';
-        } catch (error) {
-            return 'Selected Folder';
-        }
-    };
 
     useEffect(() => {
         if (id) {
@@ -63,7 +44,7 @@ export default function GameDetailsScreen() {
         if (rom) {
             checkIfFileAlreadyExists(rom);
         }
-    }, [rom, platformFolders]); // Ricontrolla anche quando le cartelle delle piattaforme cambiano
+    }, [rom]); // Ricontrolla anche quando le cartelle delle piattaforme cambiano
 
     const loadRomDetails = async () => {
         try {
@@ -86,84 +67,11 @@ export default function GameDetailsScreen() {
     const handleDownload = async () => {
         if (!rom) return;
 
-        const platformSlug = rom.platform_slug;
-        let platformFolder = getPlatformFolder(platformSlug);
-
-        
-
-        // If the platform folder is not configured, prompt the user to select one
-        if (!platformFolder) {
-            Alert.alert(
-                'Cartella Piattaforma',
-                `Non hai ancora configurato una cartella per la piattaforma "${rom.platform_name}". Seleziona una cartella dove salvare le ROM di questa piattaforma.`,
-                [
-                    { text: 'Annulla', style: 'cancel' },
-                    {
-                        text: 'Seleziona Cartella',
-                        onPress: async () => {
-                            try {
-                                const res = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-                                if (res.granted) {
-                                    const folderUri = res.directoryUri;
-                                    await savePlatformFolder(platformSlug, rom.platform_name, folderUri);
-                                    console.log(`Cartella configurata per ${rom.platform_name}:`, folderUri);
-                                    // Create the platformFolder object manually for immediate download
-                                    const newPlatformFolder = {
-                                        platformSlug,
-                                        platformName: rom.platform_name,
-                                        folderUri,
-                                        folderName: extractFolderNameFromUri(folderUri)
-                                    };
-
-                                    // Perform the download with the new platform folder
-                                    await performDownload(newPlatformFolder);
-                                }
-                            } catch (error) {
-                                console.error('Errore nella selezione della cartella:', error);
-                                Alert.alert(
-                                    'Errore',
-                                    'Impossibile selezionare la cartella. Riprova.',
-                                    [{ text: 'OK' }]
-                                );
-                            }
-                        }
-                    }
-                ]
-            );
-            return;
-        }
-
-        await performDownload();
-    };
-
-    const performDownload = async (providedPlatformFolder?: PlatformFolder) => {
-        if (!rom) return;
-
-        const platformSlug = rom.platform_slug;
-        const platformFolder = providedPlatformFolder || getPlatformFolder(platformSlug);
-        console.log('Platform Folder:', platformFolder);
-        if (!platformFolder) {
-            Alert.alert(
-                'Errore',
-                'Cartella piattaforma non configurata',
-                [{ text: 'OK' }]
-            );
-            return;
-        }
-
         try {
-            setDownloading(true);
-            setDownloadProgress(0);
-
-            // Get the download URL from the API
-            const downloadUrl = await apiClient.obtainDownloadLink(rom);
-            const fileName = rom.fs_name;
-            await downloadRomFile(downloadUrl, fileName, platformFolder);
+            await downloadRom(rom);
 
         } catch (error) {
             console.error('Download error:', error);
-            setDownloading(false);
-            setDownloadProgress(0);
             const errorMessage = error instanceof Error ? error.message : 'Si è verificato un errore durante il download. Riprova più tardi.';
             Alert.alert(
                 'Errore Download',
@@ -172,87 +80,79 @@ export default function GameDetailsScreen() {
         }
     };
 
-    const downloadRomFile = async (
-        downloadUrl: string,
-        fileName: string,
-        platformFolder: PlatformFolder
-    ) => {
-        const tempUri = FileSystem.cacheDirectory + fileName;
+    const handleDeleteFile = async (rom: Rom) => {
+        if (!existingFilePath) {
+            Alert.alert('Errore', 'Nessun file da eliminare trovato');
+            return;
+        }
 
-        // Download with progress tracking
-        const downloadResumable = FileSystem.createDownloadResumable(
-            downloadUrl,
-            tempUri,
-            {
-                headers: apiClient.getAuthHeaders(),
-            },
-            (downloadProgress) => {
-                const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
-                setDownloadProgress(Math.round(progress * 100));
-            }
-        );
+        Alert.alert(
+            'Conferma eliminazione',
+            `Sei sicuro di voler eliminare il file "${rom.name || rom.fs_name}"?\n\nQuesta azione non può essere annullata.`,
+            [
+                {
+                    text: 'Annulla',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Elimina',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setCheckingExistingFile(true);
 
-        const result = await downloadResumable.downloadAsync();
+                            // Try to delete the file using Storage Access Framework
+                            const platformSlug = rom.platform_slug;
+                            const platformFolder = await getPlatformFolder(platformSlug);
 
-        if (result) {
-            if (result.status !== 200) {
-                throw new Error(`Download failed with status ${result.status}`);
-            }
+                            if (!platformFolder) {
+                                throw new Error('Cartella della piattaforma non trovata');
+                            }
 
-            setDownloadProgress(100);
+                            // Get all files in the platform folder
+                            const files = await FileSystem.StorageAccessFramework.readDirectoryAsync(
+                                platformFolder.folderUri
+                            );
 
-            console.log("Platform Directory URI:", platformFolder.folderUri);
+                            // Find the file to delete
+                            const fileToDelete = files.find(fileUri => {
+                                const decodedUri = decodeURIComponent(fileUri);
+                                const fileName = decodedUri.split('/').pop() || '';
+                                return fileName === rom.fs_name || fileName.includes(rom.fs_name.split('.')[0]);
+                            });
 
-            // Create the file in the platform folder using Storage Access Framework
-            const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
-                platformFolder.folderUri,
-                fileName,
-                'application/octet-stream'
-            );
+                            if (fileToDelete) {
+                                await FileSystem.StorageAccessFramework.deleteAsync(fileToDelete);
 
-            // Using ReactNativeBlobUtil to write the file using MediaStore android api
-            await ReactNativeBlobUtil.MediaCollection.writeToMediafile(
-                fileUri,
-                tempUri
-            );
+                                // Update the state to reflect that the file is no longer downloaded
+                                setIsAlreadyDownloaded(false);
+                                setExistingFilePath(null);
 
-            // Delete the temporary file
-            await FileSystem.deleteAsync(tempUri, { idempotent: true });
-
-            console.log('File saved to SAF location:', decodeURIComponent(fileUri));
-
-            setDownloading(false);
-            setDownloadProgress(0);
-
-            Alert.alert(
-                'Download Completato',
-                `${fileName} è stato scaricato con successo nella cartella di ${rom?.platform_name}!`,
-                [{
-                    text: 'OK',
-                    style: 'default',
-                    onPress: () => {
-                        // Ricontrolla se il file è presente dopo il download
-                        if (rom) {
-                            checkIfFileAlreadyExists(rom);
+                                Alert.alert(
+                                    'File eliminato',
+                                    'Il file è stato eliminato con successo'
+                                );
+                            } else {
+                                throw new Error('File non trovato');
+                            }
+                        } catch (error) {
+                            console.error('Error deleting file:', error);
+                            const errorMessage = error instanceof Error ? error.message : 'Errore durante l\'eliminazione del file';
+                            Alert.alert(
+                                'Errore',
+                                `Non è stato possibile eliminare il file: ${errorMessage}`
+                            );
+                        } finally {
+                            setCheckingExistingFile(false);
                         }
-                    }
-                }]
-            );
-        }
-    };
-    
-    const calculateFileMD5 = async (fileUri: string): Promise<string> => {
-        try {
-            const hash = await ReactNativeBlobUtil.fs.hash(fileUri, 'md5');
-            return hash;
-        } catch (error) {
-            console.error('Errore nel calcolo MD5:', error);
-            throw error;
-        }
+                    },
+                },
+            ]
+        );
     };
 
     const checkIfFileAlreadyExists = async (rom: Rom): Promise<void> => {
-            // Controlla se ci sono file e se il primo file ha un hash MD5
+        // Controlla se ci sono file e se il primo file ha un hash MD5
         if (!rom.files || rom.files.length === 0 || !rom.files[0].md5_hash) {
             console.log('Nessun hash MD5 disponibile per questa ROM');
             setIsAlreadyDownloaded(false);
@@ -260,7 +160,7 @@ export default function GameDetailsScreen() {
         }
 
         const platformSlug = rom.platform_slug;
-        const platformFolder = getPlatformFolder(platformSlug);
+        const platformFolder = await getPlatformFolder(platformSlug);
 
         if (!platformFolder) {
             setIsAlreadyDownloaded(false);
@@ -289,18 +189,9 @@ export default function GameDetailsScreen() {
 
                     // If the file name matches, calculate the MD5
                     if (fileName === rom.fs_name || fileName.includes(rom.fs_name.split('.')[0])) {
-                        console.log(`Controllo MD5 del file: ${fileName}`);
-
-                        const fileMD5 = await calculateFileMD5(fileUri);
-                        console.log(`MD5 calcolato: ${fileMD5}`);
-                        console.log(`MD5 atteso: ${expectedMD5}`);
-
-                        if (fileMD5 === expectedMD5) {
-                            console.log('File già scaricato trovato!');
-                            setIsAlreadyDownloaded(true);
-                            setExistingFilePath(decodedUri);
-                            return;
-                        }
+                        setIsAlreadyDownloaded(true);
+                        setExistingFilePath(decodedUri);
+                        return;
                     }
                 } catch (fileError) {
                     console.warn(`Errore nel controllo del file ${fileUri}:`, fileError);
@@ -412,7 +303,7 @@ export default function GameDetailsScreen() {
                                         <TouchableOpacity
                                             style={[styles.downloadButton, styles.redownloadButton]}
                                             onPress={handleDownload}
-                                            disabled={downloading}
+                                            disabled={isRomDownloading(rom.id)}
                                         >
                                             <Ionicons name="download-outline" size={20} color="#fff" />
                                             <Text style={styles.downloadButtonText}>Riscarica</Text>
@@ -424,19 +315,29 @@ export default function GameDetailsScreen() {
                                             <Ionicons name="refresh-outline" size={20} color="#fff" />
                                             <Text style={styles.downloadButtonText}>Verifica</Text>
                                         </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.downloadButton, styles.deleteButton]}
+                                            onPress={() => handleDeleteFile(rom)}
+                                        >
+                                            <Ionicons name="trash-outline" size={20} color="#fff" />
+                                            <Text style={styles.downloadButtonText}>Elimina</Text>
+                                        </TouchableOpacity>
                                     </View>
                                 </View>
                             ) : (
                                 <TouchableOpacity
-                                    style={[styles.downloadButton, downloading && styles.downloadingButton]}
+                                    style={[
+                                        styles.downloadButton,
+                                        isRomDownloading(rom.id) && styles.downloadingButton
+                                    ]}
                                     onPress={handleDownload}
-                                    disabled={downloading}
+                                    disabled={isRomDownloading(rom.id)}
                                 >
-                                    {downloading ? (
+                                    {isRomDownloading(rom.id) ? (
                                         <View style={styles.downloadingContent}>
                                             <ActivityIndicator size="small" color="#fff" />
                                             <Text style={styles.downloadButtonText}>
-                                                Download in corso... {downloadProgress}%
+                                                Aggiunto alla coda
                                             </Text>
                                         </View>
                                     ) : (
@@ -446,16 +347,6 @@ export default function GameDetailsScreen() {
                                         </View>
                                     )}
                                 </TouchableOpacity>
-                            )}
-
-                            {downloading && (
-                                <View style={styles.progressContainer}>
-                                    <View style={styles.progressBar}>
-                                        <View
-                                            style={[styles.progressFill, { width: `${downloadProgress}%` }]}
-                                        />
-                                    </View>
-                                </View>
                             )}
                         </View>
                     </View>
@@ -647,14 +538,22 @@ const styles = StyleSheet.create({
     },
     alreadyDownloadedActions: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: 8,
     },
     redownloadButton: {
         backgroundColor: '#FF9500',
+        minWidth: '30%',
         flex: 1,
     },
     verifyButton: {
         backgroundColor: '#007AFF',
+        minWidth: '30%',
+        flex: 1,
+    },
+    deleteButton: {
+        backgroundColor: '#FF3B30',
+        minWidth: '30%',
         flex: 1,
     },
 });
