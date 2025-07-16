@@ -1,6 +1,6 @@
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useEffect, useState } from 'react';
 import { Dimensions } from 'react-native';
-import * as ScreenOrientation from 'expo-screen-orientation';
 
 /**
  * Hook to calculate dynamic columns based on screen dimensions and orientation
@@ -41,25 +41,25 @@ export const useDynamicColumns = () => {
 
     const calculateColumns = () => {
         const { width, height } = screenData;
-        const isLandscape = orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT || 
-                           orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT;
-        
+        const isLandscape = orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
+            orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT;
+
         // Base card width (minimum size for readability)
         const baseCardWidth = 120;
         // Padding and margins
         const horizontalPadding = 40; // 20px on each side
         const cardMargin = 10; // margin between cards
-        
+
         // Calculate available width
         const availableWidth = width - horizontalPadding;
-        
+
         // Calculate maximum possible columns based on card width
         const maxPossibleColumns = Math.floor(availableWidth / (baseCardWidth + cardMargin));
-        
+
         // Set column limits based on device type and orientation
         let minColumns = 2;
         let maxColumns = 6;
-        
+
         // Adjust based on screen size (tablet vs phone)
         if (width >= 768) { // Tablet
             minColumns = isLandscape ? 4 : 3;
@@ -68,13 +68,13 @@ export const useDynamicColumns = () => {
             minColumns = isLandscape ? 3 : 2;
             maxColumns = isLandscape ? 6 : 4;
         }
-        
+
         // Final column count within limits
         const columns = Math.max(minColumns, Math.min(maxColumns, maxPossibleColumns));
-        
+
         // Calculate actual card width based on final column count
         const actualCardWidth = Math.floor((availableWidth - (cardMargin * (columns - 1))) / columns);
-        
+
         return { columns, cardWidth: actualCardWidth, isLandscape };
     };
 

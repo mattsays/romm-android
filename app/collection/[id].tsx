@@ -6,7 +6,6 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    Dimensions,
     FlatList,
     Image,
     Pressable,
@@ -20,11 +19,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
 import { useDownload } from '../../contexts/DownloadContext';
 import { useToast } from '../../contexts/ToastContext';
+import { useDynamicColumns } from '../../hooks/useDynamicColumns';
 import { usePlatformFolders } from '../../hooks/usePlatformFolders';
 import { useRomFileSystem } from '../../hooks/useRomFileSystem';
 import { useRomsByCollection } from '../../hooks/useRoms';
 import { useTranslation } from '../../hooks/useTranslation';
-import { useDynamicColumns } from '../../hooks/useDynamicColumns';
 import { apiClient, Collection as ApiCollection, Rom } from '../../services/api';
 
 interface CollectionScreenProps { }

@@ -5,7 +5,6 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    Dimensions,
     FlatList,
     Image,
     Pressable,
@@ -17,12 +16,12 @@ import {
 } from 'react-native';
 import { useDownload } from '../../contexts/DownloadContext';
 import { useToast } from '../../contexts/ToastContext';
+import { useDynamicColumns } from '../../hooks/useDynamicColumns';
 import { usePlatformFolders } from '../../hooks/usePlatformFolders';
 import { useRomFileSystem } from '../../hooks/useRomFileSystem';
 import { usePlatform, useRoms } from '../../hooks/useRoms';
 import { useStorageAccessFramework } from '../../hooks/useStorageAccessFramework';
 import { useTranslation } from '../../hooks/useTranslation';
-import { useDynamicColumns } from '../../hooks/useDynamicColumns';
 import { Rom } from '../../services/api';
 
 export default function PlatformScreen() {
@@ -39,7 +38,7 @@ export default function PlatformScreen() {
     const [isDownloadingAll, setIsDownloadingAll] = useState(false);
     const [folderSelectionShown, setFolderSelectionShown] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    
+
     // Dynamic columns based on screen orientation and device size
     const { columns, cardWidth, isLandscape } = useDynamicColumns();
 
@@ -281,7 +280,7 @@ export default function PlatformScreen() {
         }
 
         const hasImage = rom.url_cover && rom.url_cover.trim() !== '';
-        
+
         // Calculate card height based on width to maintain aspect ratio
         const cardHeight = Math.floor(cardWidth * 1.4); // 1.4 aspect ratio
 
@@ -324,9 +323,9 @@ export default function PlatformScreen() {
                     {!isRomDownloaded(rom.id) && !isDownloading(rom.id) && (
                         <View style={styles.romOverlay}>
                             <TouchableOpacity
-                                style={[styles.downloadButton, { 
-                                    width: Math.min(32, cardWidth * 0.21), 
-                                    height: Math.min(32, cardWidth * 0.21) 
+                                style={[styles.downloadButton, {
+                                    width: Math.min(32, cardWidth * 0.21),
+                                    height: Math.min(32, cardWidth * 0.21)
                                 }]}
                                 onPress={() => handleDownload(rom)}
                             >
