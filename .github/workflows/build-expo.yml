@@ -124,16 +124,6 @@ jobs:
           restore-keys: |
             build-artifacts-${{ runner.os }}-
 
-      - name: 🧹 Clean Gradle (if needed)
-        run: |
-          # Only clean if we're doing a production build or if explicitly requested
-          if [ "${{ github.event_name }}" = "release" ] || [ "${{ inputs.build_profile }}" = "production" ]; then
-            echo "🧹 Cleaning Gradle for production build..."
-            cd android && ./gradlew clean
-          else
-            echo "⚡ Skipping Gradle clean for faster build..."
-          fi
-
       - name: 🚀 Build APK
         run: |
           
