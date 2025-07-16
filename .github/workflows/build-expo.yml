@@ -127,6 +127,15 @@ jobs:
       - name: 🚀 Build APK
         run: |
           
+          # Determine build profile
+          if [ "${{ github.event_name }}" = "release" ]; then
+            PROFILE="production"
+            echo "🎯 Building PRODUCTION build for release"
+          else
+            PROFILE="${{ inputs.build_profile || 'preview' }}"
+            echo "🎯 Building $PROFILE build (manual trigger)"
+          fi
+
           # Run the build
           eas build \
             --platform android \
