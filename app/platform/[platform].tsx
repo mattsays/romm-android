@@ -15,6 +15,7 @@ import {
     View
 } from 'react-native';
 import { useDownload } from '../../contexts/DownloadContext';
+import { useToast } from '../../contexts/ToastContext';
 import { usePlatformFolders } from '../../hooks/usePlatformFolders';
 import { useRomFileSystem } from '../../hooks/useRomFileSystem';
 import { usePlatform, useRoms } from '../../hooks/useRoms';
@@ -34,6 +35,7 @@ export default function PlatformScreen() {
     const { getPlatformFolder, savePlatformFolder, hasPlatformFolder } = usePlatformFolders();
     const { checkMultipleRoms, isRomDownloaded, isCheckingRom } = useRomFileSystem();
     const { requestDirectoryPermissions } = useStorageAccessFramework();
+    const { showSuccessToast, showErrorToast, showInfoToast } = useToast();
     const [isDownloadingAll, setIsDownloadingAll] = useState(false);
     const [folderSelectionShown, setFolderSelectionShown] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
@@ -117,17 +119,16 @@ export default function PlatformScreen() {
                                         await checkMultipleRoms(roms, folder?.folderUri || '');
                                     }
                                 }
-                                Alert.alert(
-                                    t('folderConfigured'),
-                                    t('folderConfiguredSuccessfully', { platform: currentPlatform.name })
+                                showSuccessToast(
+                                    t('folderConfiguredSuccessfully', { platform: currentPlatform.name }),
+                                    t('folderConfigured')
                                 );
                             }
                         } catch (error) {
                             console.error('Error selecting folder:', error);
-                            Alert.alert(
-                                t('error'),
+                            showErrorToast(
                                 t('errorSelectingFolder'),
-                                [{ text: 'OK' }]
+                                t('error')
                             );
                         }
                     }
@@ -148,10 +149,9 @@ export default function PlatformScreen() {
             }
         } catch (error) {
             console.error('Error refreshing data:', error);
-            Alert.alert(
-                t('error'),
+            showErrorToast(
                 t('errorRefreshingData'),
-                [{ text: 'OK' }]
+                t('error')
             );
         } finally {
             setRefreshing(false);
@@ -160,7 +160,7 @@ export default function PlatformScreen() {
 
     const handleDownloadAll = async () => {
         if (!currentPlatform || roms.length === 0) {
-            Alert.alert(t('error'), t('noRomsAvailable'));
+            showErrorToast(t('noRomsAvailable'), t('error'));
             return;
         }
 
@@ -182,7 +182,7 @@ export default function PlatformScreen() {
         const romsToDownload = roms.filter(rom => !isDownloading(rom.id) && !isRomDownloaded(rom.id));
 
         if (romsToDownload.length === 0) {
-            Alert.alert(t('info'), t('allRomsDownloaded'));
+            showInfoToast(t('allRomsDownloaded'), t('info'));
             return;
         }
 
@@ -201,13 +201,13 @@ export default function PlatformScreen() {
                                 addToQueue(rom, platformFolder);
                             });
 
-                            Alert.alert(
-                                t('downloadAllStarted'),
-                                t('romsAddedToQueue', { count: romsToDownload.length.toString() })
+                            showSuccessToast(
+                                t('romsAddedToQueue', { count: romsToDownload.length.toString() }),
+                                t('downloadAllStarted')
                             );
                         } catch (error) {
                             console.error('Error adding ROMs to queue:', error);
-                            Alert.alert(t('error'), t('errorAddingToQueue'));
+                            showErrorToast(t('errorAddingToQueue'), t('error'));
                         } finally {
                             setIsDownloadingAll(false);
                         }
@@ -221,13 +221,12 @@ export default function PlatformScreen() {
     useEffect(() => {
         const error = romsError || platformError;
         if (error) {
-            Alert.alert(
-                t('error'),
+            showErrorToast(
                 t('unableToLoadPlatformData'),
-                [{ text: t('ok') }]
+                t('error')
             );
         }
-    }, [romsError, platformError]);
+    }, [romsError, platformError, showErrorToast, t]);
 
     const handleDownload = async (rom: Rom) => {
         if (!currentPlatform) return;

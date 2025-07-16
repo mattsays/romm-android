@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
 import { useDownload } from '../../contexts/DownloadContext';
+import { useToast } from '../../contexts/ToastContext';
 import { usePlatformFolders } from '../../hooks/usePlatformFolders';
 import { useRomDownload } from '../../hooks/useRomDownload';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -23,6 +24,7 @@ export default function GameDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const { t } = useTranslation();
+    const { showSuccessToast, showErrorToast, showInfoToast } = useToast();
     const [rom, setRom] = useState<Rom | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -72,19 +74,24 @@ export default function GameDetailsScreen() {
         try {
             await downloadRom(rom);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Download error:', error);
-            const errorMessage = error instanceof Error ? error.message : t('errorDuringDownload');
-            Alert.alert(
-                t('downloadError'),
-                errorMessage
-            );
+
+            if (error.type === 'already_downloaded') {
+                showInfoToast(error.message, t('fileAlreadyDownloaded'));
+            } else {
+                const errorMessage = error instanceof Error ? error.message : t('errorDuringDownload');
+                showErrorToast(
+                    errorMessage,
+                    t('downloadError')
+                );
+            }
         }
     };
 
     const handleDeleteFile = async (rom: Rom) => {
         if (!existingFilePath) {
-            Alert.alert(t('error'), t('noFileToDelete'));
+            showErrorToast(t('noFileToDelete'), t('error'));
             return;
         }
 
@@ -130,9 +137,9 @@ export default function GameDetailsScreen() {
                                 setIsAlreadyDownloaded(false);
                                 setExistingFilePath(null);
 
-                                Alert.alert(
-                                    t('fileDeleted'),
-                                    t('fileDeletedSuccessfully')
+                                showSuccessToast(
+                                    t('fileDeletedSuccessfully'),
+                                    t('fileDeleted')
                                 );
                             } else {
                                 throw new Error(t('fileNotFound'));
@@ -140,9 +147,9 @@ export default function GameDetailsScreen() {
                         } catch (error) {
                             console.error('Error deleting file:', error);
                             const errorMessage = error instanceof Error ? error.message : t('errorDeletingFile');
-                            Alert.alert(
-                                t('error'),
-                                t('cannotDeleteFile', { error: errorMessage })
+                            showErrorToast(
+                                t('cannotDeleteFile', { error: errorMessage }),
+                                t('error')
                             );
                         } finally {
                             setCheckingExistingFile(false);

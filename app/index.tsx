@@ -21,6 +21,7 @@ import { CollectionCoverGrid } from '../components/CollectionCoverGrid';
 import { DownloadStatusBar } from '../components/DownloadStatusBar';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { useDownload } from '../contexts/DownloadContext';
+import { useToast } from '../contexts/ToastContext';
 import { useAuthCheck, useLogout } from '../hooks/useAuth';
 import { useCollections } from '../hooks/useCollections';
 import { usePlatformFolders } from '../hooks/usePlatformFolders';
@@ -38,6 +39,7 @@ export default function LibraryScreen() {
     const { recentlyAddedRoms, fetchRecentlyAddedRoms } = useRoms();
     const { user, username, isAuthenticated } = useAuthCheck();
     const { logout, isLoading: isLoggingOut } = useLogout();
+    const { showErrorToast, showInfoToast } = useToast();
     const [refreshing, setRefreshing] = useState(false);
     const [recentRomsLoading, setRecentRomsLoading] = useState(false);
     const { activeDownloads, isDownloading, completedDownloads } = useDownload();
@@ -146,13 +148,12 @@ export default function LibraryScreen() {
     // Show error if API call fails
     useEffect(() => {
         if (error || collectionsError) {
-            Alert.alert(
-                t('error'),
+            showErrorToast(
                 t('unableToLoadData'),
-                [{ text: t('ok') }]
+                t('error')
             );
         }
-    }, [error, collectionsError]);
+    }, [error, collectionsError, showErrorToast, t]);
 
     const handleDownload = async (rom: Rom) => {
         if (!rom) return;
@@ -160,13 +161,18 @@ export default function LibraryScreen() {
         try {
             await downloadRom(rom);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Download error:', error);
-            const errorMessage = error instanceof Error ? error.message : t('errorDuringDownload');
-            Alert.alert(
-                t('downloadError'),
-                errorMessage
-            );
+
+            if (error.type === 'already_downloaded') {
+                showInfoToast(error.message, t('fileAlreadyDownloaded'));
+            } else {
+                const errorMessage = error instanceof Error ? error.message : t('errorDuringDownload');
+                showErrorToast(
+                    errorMessage,
+                    t('downloadError')
+                );
+            }
         }
     };
 

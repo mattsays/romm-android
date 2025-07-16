@@ -7,6 +7,12 @@ import { usePlatformFolders } from './usePlatformFolders';
 import { useRomFileSystem } from './useRomFileSystem';
 import { useTranslation } from './useTranslation';
 
+export interface RomDownloadError extends Error {
+    type: 'already_downloaded' | 'no_folder' | 'folder_selection_failed' | 'download_failed';
+    romName?: string;
+    platformName?: string;
+}
+
 export const useRomDownload = () => {
     const { addToQueue, isDownloading, getDownloadById } = useDownload();
     const { getPlatformFolder, savePlatformFolder } = usePlatformFolders();
@@ -32,12 +38,10 @@ export const useRomDownload = () => {
     const downloadRom = useCallback(async (rom: Rom): Promise<string | null> => {
         // First check if the ROM is already downloaded (from cache)
         if (isRomDownloaded(rom.id)) {
-            Alert.alert(
-                t('fileAlreadyDownloaded'),
-                t('romAlreadyExists', { name: rom.name || rom.fs_name }),
-                [{ text: t('ok') }]
-            );
-            return null;
+            const error = new Error(t('romAlreadyExists', { name: rom.name || rom.fs_name })) as RomDownloadError;
+            error.type = 'already_downloaded';
+            error.romName = rom.name || rom.fs_name;
+            throw error;
         }
 
         const platformSlug = rom.platform_slug;
@@ -48,12 +52,10 @@ export const useRomDownload = () => {
             try {
                 const exists = await checkIfRomExists(rom);
                 if (exists) {
-                    Alert.alert(
-                        t('fileAlreadyDownloaded'),
-                        t('romAlreadyExists', { name: rom.name || rom.fs_name }),
-                        [{ text: t('ok') }]
-                    );
-                    return null;
+                    const error = new Error(t('romAlreadyExists', { name: rom.name || rom.fs_name })) as RomDownloadError;
+                    error.type = 'already_downloaded';
+                    error.romName = rom.name || rom.fs_name;
+                    throw error;
                 }
             } catch (error) {
                 console.error('Error checking if ROM exists:', error);
@@ -97,12 +99,10 @@ export const useRomDownload = () => {
                                     }
                                 } catch (error) {
                                     console.error('Error selecting folder:', error);
-                                    Alert.alert(
-                                        t('error'),
-                                        t('unableToSelectFolder'),
-                                        [{ text: t('ok') }]
-                                    );
-                                    resolve(null);
+                                    const folderError = new Error(t('unableToSelectFolder')) as RomDownloadError;
+                                    folderError.type = 'folder_selection_failed';
+                                    folderError.platformName = rom.platform_name;
+                                    throw folderError;
                                 }
                             }
                         }

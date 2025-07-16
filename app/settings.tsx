@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useToast } from '../contexts/ToastContext';
 import { usePlatformFolders } from '../hooks/usePlatformFolders';
 import { useStorageAccessFramework } from '../hooks/useStorageAccessFramework';
 import { useTranslation } from '../hooks/useTranslation';
@@ -16,6 +17,7 @@ import { useTranslation } from '../hooks/useTranslation';
 export default function SettingsScreen() {
     const { t, locale, changeLanguage, supportedLocales, isLoading } = useTranslation();
     const { requestDirectoryPermissions } = useStorageAccessFramework();
+    const { showSuccessToast, showErrorToast } = useToast();
     const {
         savePlatformFolder,
         removePlatformFolder,
@@ -31,28 +33,33 @@ export default function SettingsScreen() {
             if (folderUri) {
                 await savePlatformFolder(platformSlug, platformName, folderUri);
 
-                Alert.alert(
-                    t('success'),
+                showSuccessToast(
                     t('folderUpdatedForPlatform', { platform: platformName }),
-                    [{ text: t('ok') }]
+                    t('success')
                 );
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error selecting folder:', error);
-            Alert.alert(
-                t('error'),
-                t('cannotSelectFolder'),
-                [{ text: t('ok') }]
-            );
+
+            if (error.type === 'permissions_denied') {
+                showErrorToast(
+                    error.message,
+                    t('permissionsNotGranted')
+                );
+            } else {
+                showErrorToast(
+                    t('cannotSelectFolder'),
+                    t('error')
+                );
+            }
         }
     };
 
     const changeLanguageWithFeedback = async (newLocale: any) => {
         await changeLanguage(newLocale);
-        Alert.alert(
-            t('success'),
+        showSuccessToast(
             t('languageChanged'),
-            [{ text: t('ok') }]
+            t('success')
         );
     };
 
@@ -74,17 +81,15 @@ export default function SettingsScreen() {
                     onPress: async () => {
                         try {
                             await removeAllPlatformFolders();
-                            Alert.alert(
-                                t('success'),
+                            showSuccessToast(
                                 t('allPlatformFoldersRemoved'),
-                                [{ text: t('ok') }]
+                                t('success')
                             );
                         } catch (error) {
                             console.error('Error removing all folders:', error);
-                            Alert.alert(
-                                t('error'),
+                            showErrorToast(
                                 t('cannotRemoveAllFolders'),
-                                [{ text: t('ok') }]
+                                t('error')
                             );
                         }
                     },

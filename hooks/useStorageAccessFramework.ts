@@ -1,7 +1,9 @@
 import * as FileSystem from 'expo-file-system';
-
-import { Alert } from 'react-native';
 import { useTranslation } from './useTranslation';
+
+export interface StorageAccessError extends Error {
+    type: 'permissions_denied' | 'request_failed';
+}
 
 export const useStorageAccessFramework = () => {
     const { t } = useTranslation();
@@ -17,17 +19,19 @@ export const useStorageAccessFramework = () => {
                 return result.directoryUri;
             } else {
                 console.warn('Directory permissions not granted');
-                Alert.alert(
-                    t('permissionsNotGranted'),
-                    t('permissionsNotGrantedMessage'),
-                    [{ text: t('ok') }]
-                );
+                const error = new Error(t('permissionsNotGrantedMessage')) as StorageAccessError;
+                error.type = 'permissions_denied';
+                throw error;
             }
         } catch (error) {
             console.error('Error requesting directory permissions:', error);
+            if ((error as StorageAccessError).type) {
+                throw error; // Re-throw our custom errors
+            }
+            const requestError = new Error(t('error')) as StorageAccessError;
+            requestError.type = 'request_failed';
+            throw requestError;
         }
-
-        return null;
     };
 
     // Function to read the contents of a directory

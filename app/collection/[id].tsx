@@ -4,7 +4,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Dimensions,
     FlatList,
     Image,
@@ -13,11 +12,12 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
 import { useDownload } from '../../contexts/DownloadContext';
+import { useToast } from '../../contexts/ToastContext';
 import { usePlatformFolders } from '../../hooks/usePlatformFolders';
 import { useRomFileSystem } from '../../hooks/useRomFileSystem';
 import { useRomsByCollection } from '../../hooks/useRoms';
@@ -38,6 +38,7 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
     const [refreshing, setRefreshing] = useState(false);
     const { activeDownloads, addToQueue, isDownloading, completedDownloads } = useDownload();
     const { downloadRom } = useRomDownload();
+    const { showErrorToast, showInfoToast } = useToast();
     const { platformFolders } = usePlatformFolders();
     const { checkMultipleRoms, isRomDownloaded, isCheckingRom } = useRomFileSystem();
     const insets = useSafeAreaInsets();
@@ -58,11 +59,11 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
                 await fetchRoms();
             } catch (error) {
                 console.error('Error fetching collection data:', error);
-                Alert.alert(
-                    t('error'),
+                showErrorToast(
                     t('unableToLoadCollection'),
-                    [{ text: 'OK', onPress: () => router.back() }]
+                    t('error')
                 );
+                router.back();
             }
         };
 
@@ -131,13 +132,18 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
         try {
             await downloadRom(rom);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Download error:', error);
-            const errorMessage = error instanceof Error ? error.message : t('errorDuringDownload');
-            Alert.alert(
-                t('downloadError'),
-                errorMessage
-            );
+
+            if (error.type === 'already_downloaded') {
+                showInfoToast(error.message, t('fileAlreadyDownloaded'));
+            } else {
+                const errorMessage = error instanceof Error ? error.message : t('errorDuringDownload');
+                showErrorToast(
+                    errorMessage,
+                    t('downloadError')
+                );
+            }
         }
     };
 

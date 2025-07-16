@@ -3,7 +3,6 @@ import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -11,9 +10,10 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { PublicRoute } from '../../components/ProtectedRoute';
+import { useToast } from '../../contexts/ToastContext';
 import { useLogin } from '../../hooks/useAuth';
 import { useTranslation } from '../../hooks/useTranslation';
 import { LoginCredentials, apiClient } from '../../services/api';
@@ -28,6 +28,7 @@ export default function LoginScreen() {
     const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'failed'>('checking');
     const { login, isLoading, error, clearError } = useLogin();
     const { t } = useTranslation();
+    const { showErrorToast } = useToast();
     const router = useRouter();
 
     // Load saved server URL on component mount
@@ -84,7 +85,7 @@ export default function LoginScreen() {
 
     const handleLogin = async () => {
         if (!credentials.username.trim() || !credentials.password.trim()) {
-            Alert.alert(t('error'), t('enterUsernameAndPassword'));
+            showErrorToast(t('enterUsernameAndPassword'), t('error'));
             return;
         }
 
@@ -94,7 +95,7 @@ export default function LoginScreen() {
             router.replace('/');
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : t('errorDuringLogin');
-            Alert.alert(t('loginError'), errorMessage);
+            showErrorToast(errorMessage, t('loginError'));
         }
     };
 
