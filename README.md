@@ -37,7 +37,7 @@ RomM Android is a mobile companion app for [RomM](https://github.com/rommapp/rom
         <em>Collections View</em>
       </td>
       <td align="center">
-        <img src="./screenshots/platform_screen.jpg" alt="Platform Screen" width="1000"/>
+        <img src="./screenshots/platform_screen.png" alt="Platform Screen" width="1000"/>
         <br>
         <em>Platform ROMs</em>
       </td>
