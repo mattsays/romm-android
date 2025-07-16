@@ -21,6 +21,7 @@
     "eas-cli": "^16.15.0",
     "expo": "53.0.19",
     "expo-blur": "~14.1.5",
+    "expo-build-properties": "~0.14.8",
     "expo-constants": "~17.1.6",
     "expo-crypto": "^14.1.5",
     "expo-document-picker": "^13.1.6",
@@ -53,7 +54,7 @@
     "react-native-toast-message": "^2.3.3",
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5",
-    "expo-build-properties": "~0.14.8"
+    "sharp-cli": "^5.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
