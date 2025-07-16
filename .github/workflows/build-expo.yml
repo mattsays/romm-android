@@ -132,9 +132,8 @@ jobs:
             --platform android \
             --profile $PROFILE \
             --local \
-            --output ${{ github.workspace }}/app-release.apk \
             --non-interactive \
-            $CLEAR_CACHE
+            --output "${{ github.workspace }}/app-release.apk"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
