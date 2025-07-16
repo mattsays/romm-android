@@ -21,6 +21,30 @@ RomM Android is a mobile companion app for [RomM](https://github.com/rommapp/rom
 - 📱 **Retrohandled-Optimized Interface**: Beautiful, responsive design built for retrohandleds
 - 📁 **File Management**: Download and manage ROM files on your device
 
+## 📸 Screenshots
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="./screenshots/library_screen.png" alt="Library Screen" width="1000"/>
+        <br>
+        <em>Library & Recently Added</em>
+      </td>
+      <td align="center">
+        <img src="./screenshots/collections_screen.png" alt="Collections Screen" width="1000"/>
+        <br>
+        <em>Collections View</em>
+      </td>
+      <td align="center">
+        <img src="./screenshots/platform_screen.jpg" alt="Platform Screen" width="1000"/>
+        <br>
+        <em>Platform ROMs</em>
+      </td>
+    </tr>
+  </table>
+</div>
+
 ## 🚀 Getting Started
 
 ### Installation
