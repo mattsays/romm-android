@@ -343,7 +343,7 @@ class ApiClient {
     // Authentication methods
     async heartbeat(): Promise<boolean> {
         // Ping the server to check if it's alive
-        const response = await fetch(`${this.baseUrl}/`);
+        const response = await fetch(`${this.baseUrl}`);
         return response.ok;
     }
 
