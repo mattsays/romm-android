@@ -23,6 +23,75 @@ RomM Android is a mobile companion app for [RomM](https://github.com/rommapp/rom
 
 ## 🚀 Getting Started
 
+### Installation
+1. **Download the APK**: Get the latest release from the [Releases page](https://github.com/mattsays/romm-android/releases)
+2. **Install the APK**: Enable installation from unknown sources in your Android settings, then install the downloaded APK
+3. **Open the App**: Launch RomM Android and log in with your RomM server credentials.
+
+## 📁 How To - Folder Management
+
+RomM Android uses a sophisticated folder management system that allows you to organize your ROM files efficiently. Here's how it works:
+
+### Overview
+
+The app manages folders in two main ways:
+- **Platform-specific folders**: Each gaming platform (NES, SNES, PlayStation, etc.) can have its own dedicated folder
+- **Automatic folder selection**: When you download your first ROM for a platform, the app will prompt you to select a folder
+
+### How Folder Management Works
+
+#### 1. **First-time Setup**
+When you download your first ROM for any platform:
+1. The app checks if a folder is already configured for that platform
+2. If no folder exists, it automatically prompts you to select one
+3. You'll see a dialog asking you to choose a folder for that specific platform
+4. Once selected, all future ROMs for that platform will be saved in the same folder
+
+#### 2. **Folder Configuration**
+- **Automatic**: Prompted when downloading first ROM of a platform
+- **Manual**: Configure folders in Settings → Platform Folders
+- **Per-platform**: Each platform can have its own unique folder
+- **Flexible**: You can change folder locations anytime
+
+#### 3. **Storage Access Framework (SAF)**
+The app uses Android's Storage Access Framework which:
+- ✅ Works with any storage location (internal, SD card, cloud storage)
+- ✅ Maintains permissions across app updates
+- ✅ Provides secure access to your files
+- ✅ No need for broad storage permissions
+
+### Managing Folders
+
+#### In Settings
+Navigate to **Settings → Platform Folders** to:
+- View all configured platform folders
+- Change folder location for any platform
+- Remove folder configuration for a platform
+- Remove all platform folder configurations
+
+#### During Download
+When downloading a ROM:
+1. App checks if platform folder exists
+2. If exists: ROM downloads directly to that folder
+3. If missing: Shows folder selection dialog
+4. Selected folder is saved for future downloads of that platform
+
+#### Folder Selection Dialog
+The folder selection dialog shows:
+- **Current folder** (if one is already configured)
+- **Platform name** you're configuring
+- Options to **Change** or **Cancel**
+
+### Key Features
+
+#### Smart File Detection
+- Automatically detects if a ROM is already downloaded
+- Prevents duplicate downloads
+
+
+## 🔧 Development
+
+
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (version 18 or higher)
@@ -31,6 +100,8 @@ RomM Android is a mobile companion app for [RomM](https://github.com/rommapp/rom
 - A running [RomM server](https://github.com/rommapp/romm)
 
 ### Installation
+
+
 
 1. **Clone the repository**
    ```bash
@@ -52,8 +123,6 @@ RomM Android is a mobile companion app for [RomM](https://github.com/rommapp/rom
    ```bash
    npm run android
    ```
-
-## 🔧 Development
 
 ### Project Structure
 
