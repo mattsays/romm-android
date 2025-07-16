@@ -3,7 +3,6 @@
     "name": "RomM",
     "slug": "RomM",
     "version": "1.0.0",
-    "orientation": "landscape",
     "icon": "./assets/images/icon.png",
     "scheme": "rommandroid",
     "userInterfaceStyle": "automatic",

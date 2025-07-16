@@ -1,4 +1,4 @@
-name: 🚀 Build APK
+name: Build APK
 
 on:
   release:
@@ -20,6 +20,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     
+    env:
+      # Optimize Gradle builds
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=true"
+      # Optimize Node.js builds
+      NODE_OPTIONS: "--max-old-space-size=4096"
+      # Enable build cache
+      EAS_BUILD_AUTOCOMMIT: "1"
+    
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
@@ -36,11 +44,66 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: 📋 Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.gradle/build-cache
+            ./android/.gradle
+            ./android/app/.gradle
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/gradle.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: 📋 Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/android/sdk
+            ~/.android
+          key: android-sdk-${{ runner.os }}-${{ hashFiles('**/build.gradle', '**/gradle.properties') }}
+          restore-keys: |
+            android-sdk-${{ runner.os }}-
+
       - name: 🤖 Setup Android SDK
         uses: android-actions/setup-android@v3
 
       - name: 📦 Install dependencies
-        run: npm ci
+        run: |
+          # Check if node_modules is cached and up to date
+          if [ -d "node_modules" ] && [ -f "package-lock.json" ]; then
+            echo "📋 Checking if dependencies are up to date..."
+            npm ls --depth=0 > /dev/null 2>&1 && {
+              echo "✅ Dependencies are up to date, skipping install"
+              exit 0
+            } || echo "🔄 Dependencies need update, proceeding with install..."
+          fi
+          
+          echo "📦 Installing dependencies..."
+          npm ci --prefer-offline --no-audit
+
+      - name: 📋 Cache Expo CLI
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm/_npx
+            ~/.cache/yarn
+            ~/.expo
+          key: expo-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}
+          restore-keys: |
+            expo-${{ runner.os }}-
+
+      - name: 📋 Cache EAS Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.eas
+            ./.eas-build-cache
+          key: eas-build-${{ runner.os }}-${{ hashFiles('**/eas.json', '**/app.json', '**/package.json') }}
+          restore-keys: |
+            eas-build-${{ runner.os }}-
 
       - name: 🏗️ Setup Expo
         uses: expo/expo-github-action@v8
@@ -49,51 +112,48 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: 📋 Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./android/app/build
+            ./android/build
+            ./.expo
+            ./dist
+          key: build-artifacts-${{ runner.os }}-${{ hashFiles('**/package.json', '**/app.json', '**/eas.json', 'app/**/*.tsx', 'app/**/*.ts', 'components/**/*.tsx', 'hooks/**/*.ts', 'services/**/*.ts') }}
+          restore-keys: |
+            build-artifacts-${{ runner.os }}-
+
+      - name: 🧹 Clean Gradle (if needed)
+        run: |
+          # Only clean if we're doing a production build or if explicitly requested
+          if [ "${{ github.event_name }}" = "release" ] || [ "${{ inputs.build_profile }}" = "production" ]; then
+            echo "🧹 Cleaning Gradle for production build..."
+            cd android && ./gradlew clean
+          else
+            echo "⚡ Skipping Gradle clean for faster build..."
+          fi
+
       - name: 🚀 Build APK
         run: |
-          # Determine build profile
-          if [ "${{ github.event_name }}" = "release" ]; then
-            PROFILE="production"
-            echo "🎯 Building PRODUCTION build for release"
-          else
-            PROFILE="${{ inputs.build_profile || 'preview' }}"
-            echo "🎯 Building $PROFILE build (manual trigger)"
-          fi
-          
-          echo "📋 Build info:"
-          echo "  Profile: $PROFILE"
-          echo "  Platform: Android"
-          echo "  Method: EAS Local Build"
           
           # Run the build
           eas build \
             --platform android \
             --profile $PROFILE \
             --local \
+            --output ${{ github.workspace }}/app-release.apk \
             --non-interactive \
-            --clear-cache
+            $CLEAR_CACHE
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: 🔍 Locate APK
         id: locate-apk
         run: |
-          echo "🔍 Searching for APK files..."
-          
-          # Search in common locations
-          APK_FILES=$(find . -name "*.apk" -type f 2>/dev/null || true)
-          
-          if [ -z "$APK_FILES" ]; then
-            echo "❌ No APK files found"
-            echo "📂 Directory structure:"
-            find . -type d -name "*build*" -o -name "*output*" -o -name "*dist*" | head -20
-            echo "📂 Current directory contents:"
-            ls -la
-            exit 1
-          fi
           
           # Get the first APK file
-          APK_PATH=$(echo "$APK_FILES" | head -1)
+          APK_PATH=${{ github.workspace }}/app-release.apk
           
           # Create descriptive filename
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
