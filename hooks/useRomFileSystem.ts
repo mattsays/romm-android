@@ -1,10 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import { useCallback, useMemo, useState } from 'react';
-import ReactNativeBlobUtil from 'react-native-blob-util';
 import { Rom } from '../services/api';
 import { usePlatformFolders } from './usePlatformFolders';
-import { File, Paths } from 'expo-file-system/next';
 
 
 interface RomHash {
@@ -21,22 +18,22 @@ export const useRomFileSystem = () => {
         try {
             const fileStat = await FileSystem.getInfoAsync(fileUri, { md5: true });
 
-            if( !fileStat.exists || !fileStat.md5) {
+            if (!fileStat.exists || !fileStat.md5) {
                 console.warn(`File not found or MD5 not available for: ${fileUri}`);
                 return null;
             }
 
             return fileStat.md5;
         } catch (error) {
-            console.error('Errore nel calcolo MD5:', error);
+            console.error('Error calculating MD5:', error);
             throw error;
         }
     }, []);
 
     const checkIfRomExists = useCallback(async (rom: Rom): Promise<boolean> => {
-        // Controlla se ci sono file e se il primo file ha un hash MD5
+        // Check if there are files and if the first file has an MD5 hash
         if (!rom.files || rom.files.length === 0 || !rom.files[0].md5_hash) {
-            console.log('Nessun hash MD5 disponibile per questa ROM');
+            console.log('No MD5 hash available for this ROM');
             return false;
         }
 
@@ -66,32 +63,32 @@ export const useRomFileSystem = () => {
 
                     // If the file name matches, calculate the MD5
                     if (fileName === rom.fs_name || fileName.includes(rom.fs_name.split('.')[0])) {
-                        console.log(`Controllo MD5 del file: ${fileName}`);
+                        console.log(`Checking MD5 of file: ${fileName}`);
 
                         const fileMD5 = await calculateFileMD5(fileUri);
-                        console.log(`MD5 calcolato: ${fileMD5}`);
-                        console.log(`MD5 atteso: ${expectedMD5}`);
+                        console.log(`Calculated MD5: ${fileMD5}`);
+                        console.log(`Expected MD5: ${expectedMD5}`);
 
                         if (fileMD5 === expectedMD5) {
-                            console.log('File già scaricato trovato!');
+                            console.log('Already downloaded file found!');
                             const exists = true;
                             setFileChecks(prev => ({ ...prev, [rom.id]: exists }));
                             return exists;
                         }
                     }
                 } catch (fileError) {
-                    console.warn(`Errore nel controllo del file ${fileUri}:`, fileError);
+                    console.warn(`Error checking file ${fileUri}:`, fileError);
                     // Continue checking other files even if one fails
                 }
             }
 
-            console.log('File non trovato nella cartella');
+            console.log('File not found in folder');
             const exists = false;
             setFileChecks(prev => ({ ...prev, [rom.id]: exists }));
             return exists;
 
         } catch (error) {
-            console.error('Errore nel controllo dei file esistenti:', error);
+            console.error('Error checking existing files:', error);
             const exists = false;
             setFileChecks(prev => ({ ...prev, [rom.id]: exists }));
             return exists;

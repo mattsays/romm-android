@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
     Alert,
     ScrollView,
@@ -14,19 +14,15 @@ import { useStorageAccessFramework } from '../hooks/useStorageAccessFramework';
 import { useTranslation } from '../hooks/useTranslation';
 
 export default function SettingsScreen() {
-    const { t } = useTranslation();
+    const { t, locale, changeLanguage, supportedLocales, isLoading } = useTranslation();
     const { requestDirectoryPermissions } = useStorageAccessFramework();
     const {
         savePlatformFolder,
         removePlatformFolder,
-        getAllConfiguredPlatforms,
-        loadPlatformFolders
+        removeAllPlatformFolders,
+        loadPlatformFolders,
+        platformFolders
     } = usePlatformFolders();
-
-    // Ricarica le informazioni delle cartelle quando il componente viene montato
-    React.useEffect(() => {
-        loadPlatformFolders();
-    }, []);
 
     const changePlatformFolder = async (platformSlug: string, platformName: string) => {
         try {
@@ -37,37 +33,59 @@ export default function SettingsScreen() {
 
                 Alert.alert(
                     t('success'),
-                    `Cartella aggiornata per la piattaforma ${platformName}`,
-                    [{ text: 'OK' }]
+                    t('folderUpdatedForPlatform', { platform: platformName }),
+                    [{ text: t('ok') }]
                 );
             }
         } catch (error) {
-            console.error('Errore nella selezione della cartella:', error);
+            console.error('Error selecting folder:', error);
             Alert.alert(
                 t('error'),
                 t('cannotSelectFolder'),
-                [{ text: 'OK' }]
+                [{ text: t('ok') }]
             );
         }
     };
 
-    const removePlatformFolderConfirm = async (platformSlug: string, platformName: string) => {
+    const changeLanguageWithFeedback = async (newLocale: any) => {
+        await changeLanguage(newLocale);
         Alert.alert(
-            'Conferma',
-            `Vuoi rimuovere la cartella configurata per ${platformName}?`,
+            t('success'),
+            t('languageChanged'),
+            [{ text: t('ok') }]
+        );
+    };
+
+    const removePlatformFolderConfirm = async (platformSlug: string, platformName: string) => {
+    };
+
+    const removeAllPlatformFoldersConfirm = async () => {
+        Alert.alert(
+            t('confirm'),
+            t('confirmRemoveAllPlatformFolders'),
             [
                 {
                     text: t('cancel'),
                     style: 'cancel',
                 },
                 {
-                    text: t('remove'),
+                    text: t('removeAll'),
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await removePlatformFolder(platformSlug);
+                            await removeAllPlatformFolders();
+                            Alert.alert(
+                                t('success'),
+                                t('allPlatformFoldersRemoved'),
+                                [{ text: t('ok') }]
+                            );
                         } catch (error) {
-                            console.error('Errore nella rimozione della cartella:', error);
+                            console.error('Error removing all folders:', error);
+                            Alert.alert(
+                                t('error'),
+                                t('cannotRemoveAllFolders'),
+                                [{ text: t('ok') }]
+                            );
                         }
                     },
                 },
@@ -75,7 +93,10 @@ export default function SettingsScreen() {
         );
     };
 
-    const configuredPlatforms = getAllConfiguredPlatforms();
+    useEffect(() => {
+        // Load configured platforms when the component mounts
+        loadPlatformFolders();
+    }, []);
 
     return (
         <View style={styles.container}>
@@ -93,14 +114,14 @@ export default function SettingsScreen() {
 
                 {/* Platform Folders Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Cartelle Piattaforme</Text>
+                    <Text style={styles.sectionTitle}>{t('platformFolders')}</Text>
                     <Text style={styles.sectionDescription}>
-                        Configura una cartella specifica per ogni piattaforma di gioco.
+                        {t('platformFoldersDescription')}
                     </Text>
 
-                    {configuredPlatforms.length > 0 ? (
+                    {platformFolders.length > 0 ? (
                         <View>
-                            {configuredPlatforms.map((platform) => (
+                            {platformFolders.map((platform) => (
                                 <View key={platform.platformSlug} style={styles.folderInfo}>
                                     <View style={styles.folderPath}>
                                         <Ionicons name="folder" size={20} color="#4CAF50" />
@@ -122,32 +143,114 @@ export default function SettingsScreen() {
                                             onPress={() => changePlatformFolder(platform.platformSlug, platform.platformName)}
                                         >
                                             <Ionicons name="create-outline" size={20} color="#fff" />
-                                            <Text style={styles.buttonText}>Cambia</Text>
+                                            <Text style={styles.buttonText}>{t('change')}</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[styles.button, styles.removeButton]}
                                             onPress={() => removePlatformFolderConfirm(platform.platformSlug, platform.platformName)}
                                         >
                                             <Ionicons name="trash-outline" size={20} color="#fff" />
-                                            <Text style={styles.buttonText}>Rimuovi</Text>
+                                            <Text style={styles.buttonText}>{t('remove')}</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
                             ))}
 
+                            {/* Remove All Button */}
+                            <TouchableOpacity
+                                style={[styles.button, styles.removeAllButton]}
+                                onPress={removeAllPlatformFoldersConfirm}
+                            >
+                                <Ionicons name="trash-bin-outline" size={20} color="#fff" />
+                                <Text style={styles.buttonText}>{t('removeAllPlatformFolders')}</Text>
+                            </TouchableOpacity>
+
                         </View>
                     ) : (
                         <View>
                             <Text style={styles.noFoldersText}>
-                                Nessuna cartella configurata. Le cartelle verranno richieste automaticamente quando scarichi la prima ROM di una piattaforma.
+                                {t('noPlatformFolders')}
                             </Text>
                         </View>
                     )}
+
+                </View>
+
+                {/* Language Selection Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>{t('language')}</Text>
+                    <Text style={styles.sectionDescription}>
+                        {t('languageDescription')}
+                    </Text>
+
+                    <View style={styles.languageGrid}>
+                        {isLoading ? (
+                            <Text style={styles.noFoldersText}>{t('loading')}</Text>
+                        ) : (
+                            supportedLocales.map((localeCode) => (
+                                <TouchableOpacity
+                                    key={localeCode}
+                                    style={[
+                                        styles.languageButton,
+                                        locale === localeCode && styles.languageButtonActive
+                                    ]}
+                                    onPress={() => changeLanguageWithFeedback(localeCode)}
+                                >
+                                    <Text style={[
+                                        styles.languageText,
+                                        locale === localeCode && styles.languageTextActive
+                                    ]}>
+                                        {getLanguageName(localeCode)}
+                                    </Text>
+                                    <Text style={[
+                                        styles.languageNativeText,
+                                        locale === localeCode && styles.languageNativeTextActive
+                                    ]}>
+                                        {getLanguageNativeName(localeCode)}
+                                    </Text>
+                                    {locale === localeCode && (
+                                        <Ionicons name="checkmark-circle" size={18} color="#4CAF50" style={styles.checkIcon} />
+                                    )}
+                                </TouchableOpacity>
+                            ))
+                        )}
+                    </View>
                 </View>
 
             </ScrollView>
         </View>
     );
+}
+
+// Helper functions for language names
+function getLanguageName(locale: string): string {
+    const names: Record<string, string> = {
+        'en': 'English',
+        'it': 'Italian',
+        'fr': 'French',
+        'es': 'Spanish',
+        'de': 'German',
+        'pt': 'Portuguese',
+        'ja': 'Japanese',
+        'ru': 'Russian',
+        'nl': 'Dutch',
+    };
+    return names[locale] || locale;
+}
+
+function getLanguageNativeName(locale: string): string {
+    const nativeNames: Record<string, string> = {
+        'en': 'English',
+        'it': 'Italiano',
+        'fr': 'Français',
+        'es': 'Español',
+        'de': 'Deutsch',
+        'pt': 'Português',
+        'ja': '日本語',
+        'ru': 'Русский',
+        'nl': 'Nederlands',
+    };
+    return nativeNames[locale] || locale;
 }
 
 const styles = StyleSheet.create({
@@ -248,6 +351,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#FF3B30',
         flex: 1,
     },
+    removeAllButton: {
+        backgroundColor: '#FF3B30',
+        marginTop: 16,
+    },
     addButton: {
         backgroundColor: '#34C759',
         marginTop: 12,
@@ -267,5 +374,46 @@ const styles = StyleSheet.create({
         color: '#666',
         fontSize: 14,
         fontStyle: 'italic',
+    },
+    languageGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginTop: 12,
+    },
+    languageButton: {
+        backgroundColor: '#2C2C2E',
+        borderRadius: 12,
+        padding: 16,
+        minWidth: '47%',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: 'transparent',
+        position: 'relative',
+    },
+    languageButtonActive: {
+        backgroundColor: '#1C4B3A',
+        borderColor: '#4CAF50',
+    },
+    languageText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    languageTextActive: {
+        color: '#4CAF50',
+    },
+    languageNativeText: {
+        color: '#ccc',
+        fontSize: 12,
+    },
+    languageNativeTextActive: {
+        color: '#81C995',
+    },
+    checkIcon: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
     },
 });

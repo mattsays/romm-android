@@ -4,10 +4,14 @@ import { Alert } from 'react-native';
 import { useDownload } from '../contexts/DownloadContext';
 import { Rom } from '../services/api';
 import { usePlatformFolders } from './usePlatformFolders';
+import { useRomFileSystem } from './useRomFileSystem';
+import { useTranslation } from './useTranslation';
 
 export const useRomDownload = () => {
     const { addToQueue, isDownloading, getDownloadById } = useDownload();
     const { getPlatformFolder, savePlatformFolder } = usePlatformFolders();
+    const { checkIfRomExists, isRomDownloaded } = useRomFileSystem();
+    const { t } = useTranslation();
 
     const extractFolderNameFromUri = (uri: string): string => {
         try {
@@ -26,23 +30,51 @@ export const useRomDownload = () => {
     };
 
     const downloadRom = useCallback(async (rom: Rom): Promise<string | null> => {
+        // First check if the ROM is already downloaded (from cache)
+        if (isRomDownloaded(rom.id)) {
+            Alert.alert(
+                t('fileAlreadyDownloaded'),
+                t('romAlreadyExists', { name: rom.name || rom.fs_name }),
+                [{ text: t('ok') }]
+            );
+            return null;
+        }
+
         const platformSlug = rom.platform_slug;
         let platformFolder = await getPlatformFolder(platformSlug);
+
+        // If platform folder exists, do a real-time check for the file
+        if (platformFolder) {
+            try {
+                const exists = await checkIfRomExists(rom);
+                if (exists) {
+                    Alert.alert(
+                        t('fileAlreadyDownloaded'),
+                        t('romAlreadyExists', { name: rom.name || rom.fs_name }),
+                        [{ text: t('ok') }]
+                    );
+                    return null;
+                }
+            } catch (error) {
+                console.error('Error checking if ROM exists:', error);
+                // Continue with download if check fails
+            }
+        }
 
         // If the platform folder is not configured, prompt the user to select one
         if (!platformFolder) {
             return new Promise((resolve) => {
                 Alert.alert(
-                    'Cartella Piattaforma',
-                    `Non hai ancora configurato una cartella per la piattaforma "${rom.platform_name}". Seleziona una cartella dove salvare le ROM di questa piattaforma.`,
+                    t('platformFolderTitle'),
+                    t('platformFolderMessage', { platform: rom.platform_name }),
                     [
                         {
-                            text: 'Annulla',
+                            text: t('cancel'),
                             style: 'cancel',
                             onPress: () => resolve(null)
                         },
                         {
-                            text: 'Seleziona Cartella',
+                            text: t('selectFolder'),
                             onPress: async () => {
                                 try {
                                     const res = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
@@ -64,11 +96,11 @@ export const useRomDownload = () => {
                                         resolve(null);
                                     }
                                 } catch (error) {
-                                    console.error('Errore nella selezione della cartella:', error);
+                                    console.error('Error selecting folder:', error);
                                     Alert.alert(
-                                        'Errore',
-                                        'Impossibile selezionare la cartella. Riprova.',
-                                        [{ text: 'OK' }]
+                                        t('error'),
+                                        t('unableToSelectFolder'),
+                                        [{ text: t('ok') }]
                                     );
                                     resolve(null);
                                 }
@@ -82,7 +114,7 @@ export const useRomDownload = () => {
         // Add to download queue
         const downloadId = addToQueue(rom, platformFolder);
         return downloadId;
-    }, [addToQueue, getPlatformFolder, savePlatformFolder]);
+    }, [addToQueue, getPlatformFolder, savePlatformFolder, checkIfRomExists, isRomDownloaded, t]);
 
     const isRomDownloading = useCallback((romId: number): boolean => {
         return isDownloading(romId);

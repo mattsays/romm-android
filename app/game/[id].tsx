@@ -16,11 +16,13 @@ import { ProtectedRoute } from '../../components/ProtectedRoute';
 import { useDownload } from '../../contexts/DownloadContext';
 import { usePlatformFolders } from '../../hooks/usePlatformFolders';
 import { useRomDownload } from '../../hooks/useRomDownload';
+import { useTranslation } from '../../hooks/useTranslation';
 import { apiClient, Rom } from '../../services/api';
 
 export default function GameDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
+    const { t } = useTranslation();
     const [rom, setRom] = useState<Rom | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -39,12 +41,12 @@ export default function GameDetailsScreen() {
         }
     }, [id]);
 
-    // Controlla se il file è già stato scaricato quando la ROM è caricata
+    // Check if the file is already downloaded when the ROM is loaded
     useEffect(() => {
         if (rom) {
             checkIfFileAlreadyExists(rom);
         }
-    }, [rom]); // Ricontrolla anche quando le cartelle delle piattaforme cambiano
+    }, [rom]); // Also recheck when platform folders change
 
     const loadRomDetails = async () => {
         try {
@@ -54,7 +56,7 @@ export default function GameDetailsScreen() {
             setRom(romData);
         } catch (error) {
             console.error('Error loading ROM details:', error);
-            setError('Errore nel caricamento dei dettagli del gioco');
+            setError(t('errorLoadingGameDetails'));
         } finally {
             setLoading(false);
         }
@@ -72,9 +74,9 @@ export default function GameDetailsScreen() {
 
         } catch (error) {
             console.error('Download error:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Si è verificato un errore durante il download. Riprova più tardi.';
+            const errorMessage = error instanceof Error ? error.message : t('errorDuringDownload');
             Alert.alert(
-                'Errore Download',
+                t('downloadError'),
                 errorMessage
             );
         }
@@ -82,20 +84,20 @@ export default function GameDetailsScreen() {
 
     const handleDeleteFile = async (rom: Rom) => {
         if (!existingFilePath) {
-            Alert.alert('Errore', 'Nessun file da eliminare trovato');
+            Alert.alert(t('error'), t('noFileToDelete'));
             return;
         }
 
         Alert.alert(
-            'Conferma eliminazione',
-            `Sei sicuro di voler eliminare il file "${rom.name || rom.fs_name}"?\n\nQuesta azione non può essere annullata.`,
+            t('confirmDeletion'),
+            t('confirmDeleteFile', { fileName: rom.name || rom.fs_name }),
             [
                 {
-                    text: 'Annulla',
+                    text: t('cancel'),
                     style: 'cancel',
                 },
                 {
-                    text: 'Elimina',
+                    text: t('delete'),
                     style: 'destructive',
                     onPress: async () => {
                         try {
@@ -106,7 +108,7 @@ export default function GameDetailsScreen() {
                             const platformFolder = await getPlatformFolder(platformSlug);
 
                             if (!platformFolder) {
-                                throw new Error('Cartella della piattaforma non trovata');
+                                throw new Error(t('platformFolderNotFound'));
                             }
 
                             // Get all files in the platform folder
@@ -129,18 +131,18 @@ export default function GameDetailsScreen() {
                                 setExistingFilePath(null);
 
                                 Alert.alert(
-                                    'File eliminato',
-                                    'Il file è stato eliminato con successo'
+                                    t('fileDeleted'),
+                                    t('fileDeletedSuccessfully')
                                 );
                             } else {
-                                throw new Error('File non trovato');
+                                throw new Error(t('fileNotFound'));
                             }
                         } catch (error) {
                             console.error('Error deleting file:', error);
-                            const errorMessage = error instanceof Error ? error.message : 'Errore durante l\'eliminazione del file';
+                            const errorMessage = error instanceof Error ? error.message : t('errorDeletingFile');
                             Alert.alert(
-                                'Errore',
-                                `Non è stato possibile eliminare il file: ${errorMessage}`
+                                t('error'),
+                                t('cannotDeleteFile', { error: errorMessage })
                             );
                         } finally {
                             setCheckingExistingFile(false);
@@ -152,9 +154,9 @@ export default function GameDetailsScreen() {
     };
 
     const checkIfFileAlreadyExists = async (rom: Rom): Promise<void> => {
-        // Controlla se ci sono file e se il primo file ha un hash MD5
+        // Check if there are files and if the first file has an MD5 hash
         if (!rom.files || rom.files.length === 0 || !rom.files[0].md5_hash) {
-            console.log('Nessun hash MD5 disponibile per questa ROM');
+            console.log('No MD5 hash available for this ROM');
             setIsAlreadyDownloaded(false);
             return;
         }
@@ -169,16 +171,14 @@ export default function GameDetailsScreen() {
 
         try {
             setCheckingExistingFile(true);
-            console.log('Controllo se il file esiste già...');
+            console.log('Checking if file already exists...');
 
             // Read all files in the platform folder
             const files = await FileSystem.StorageAccessFramework.readDirectoryAsync(
                 platformFolder.folderUri
             );
 
-            console.log(`Trovati ${files.length} file nella cartella ${platformFolder.platformName}`);
-
-            const expectedMD5 = rom.files[0].md5_hash;
+            console.log(`Found ${files.length} files in folder ${platformFolder.platformName}`);
 
             // Check each file to see if it matches our MD5 hash
             for (const fileUri of files) {
@@ -194,17 +194,17 @@ export default function GameDetailsScreen() {
                         return;
                     }
                 } catch (fileError) {
-                    console.warn(`Errore nel controllo del file ${fileUri}:`, fileError);
+                    console.warn(`Error checking file ${fileUri}:`, fileError);
                     // Continue checking other files even if one fails
                 }
             }
 
-            console.log('File non trovato nella cartella');
+            console.log('File not found in folder');
             setIsAlreadyDownloaded(false);
             setExistingFilePath(null);
 
         } catch (error) {
-            console.error('Errore nel controllo dei file esistenti:', error);
+            console.error('Error checking existing files:', error);
             setIsAlreadyDownloaded(false);
             setExistingFilePath(null);
         } finally {
@@ -217,7 +217,7 @@ export default function GameDetailsScreen() {
             <ProtectedRoute>
                 <View style={styles.centered}>
                     <ActivityIndicator size="large" color="#007AFF" />
-                    <Text style={styles.loadingText}>Caricamento...</Text>
+                    <Text style={styles.loadingText}>{t('loading')}</Text>
                 </View>
             </ProtectedRoute>
         );
@@ -229,10 +229,10 @@ export default function GameDetailsScreen() {
                 <View style={styles.centered}>
                     <Ionicons name="alert-circle-outline" size={64} color="#ef4444" />
                     <Text style={styles.errorText}>
-                        {error || 'Gioco non trovato'}
+                        {error || t('gameNotFound')}
                     </Text>
                     <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-                        <Text style={styles.backButtonText}>Torna indietro</Text>
+                        <Text style={styles.backButtonText}>{t('goBack')}</Text>
                     </TouchableOpacity>
                 </View>
             </ProtectedRoute>
@@ -246,7 +246,7 @@ export default function GameDetailsScreen() {
                     <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
                         <Ionicons name="arrow-back" size={24} color="#fff" />
                     </TouchableOpacity>
-                    <Text style={styles.title}>Dettagli Gioco</Text>
+                    <Text style={styles.title}>{t('gameDetails')}</Text>
                 </View>
 
                 <View style={styles.content}>
@@ -264,21 +264,21 @@ export default function GameDetailsScreen() {
 
                         {rom.summary && (
                             <View style={styles.section}>
-                                <Text style={styles.sectionTitle}>Descrizione</Text>
+                                <Text style={styles.sectionTitle}>{t('description')}</Text>
                                 <Text style={styles.summary}>{rom.summary}</Text>
                             </View>
                         )}
 
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Informazioni</Text>
+                            <Text style={styles.sectionTitle}>{t('information')}</Text>
                             <View style={styles.infoRow}>
-                                <Text style={styles.infoLabel}>Dimensione:</Text>
+                                <Text style={styles.infoLabel}>{t('size')}:</Text>
                                 <Text style={styles.infoValue}>
                                     {(rom.fs_size_bytes / (1024 * 1024)).toFixed(2)} MB
                                 </Text>
                             </View>
                             <View style={styles.infoRow}>
-                                <Text style={styles.infoLabel}>Piattaforma:</Text>
+                                <Text style={styles.infoLabel}>{t('platform')}:</Text>
                                 <Text style={styles.infoValue}>{rom.platform_name}</Text>
                             </View>
                         </View>
@@ -288,16 +288,16 @@ export default function GameDetailsScreen() {
                             {checkingExistingFile ? (
                                 <View style={styles.checkingContainer}>
                                     <ActivityIndicator size="small" color="#007AFF" />
-                                    <Text style={styles.checkingText}>Controllo file esistenti...</Text>
+                                    <Text style={styles.checkingText}>{t('checkingExistingFiles')}</Text>
                                 </View>
                             ) : isAlreadyDownloaded ? (
                                 <View style={styles.alreadyDownloadedContainer}>
                                     <View style={styles.alreadyDownloadedHeader}>
                                         <Ionicons name="checkmark-circle" size={24} color="#34C759" />
-                                        <Text style={styles.alreadyDownloadedTitle}>File già scaricato</Text>
+                                        <Text style={styles.alreadyDownloadedTitle}>{t('fileAlreadyDownloaded')}</Text>
                                     </View>
                                     <Text style={styles.alreadyDownloadedPath}>
-                                        Percorso: {existingFilePath}
+                                        {t('filePath')}: {existingFilePath}
                                     </Text>
                                     <View style={styles.alreadyDownloadedActions}>
                                         <TouchableOpacity
@@ -306,21 +306,21 @@ export default function GameDetailsScreen() {
                                             disabled={isRomDownloading(rom.id)}
                                         >
                                             <Ionicons name="download-outline" size={20} color="#fff" />
-                                            <Text style={styles.downloadButtonText}>Riscarica</Text>
+                                            <Text style={styles.downloadButtonText}>{t('redownload')}</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[styles.downloadButton, styles.verifyButton]}
                                             onPress={() => checkIfFileAlreadyExists(rom)}
                                         >
                                             <Ionicons name="refresh-outline" size={20} color="#fff" />
-                                            <Text style={styles.downloadButtonText}>Verifica</Text>
+                                            <Text style={styles.downloadButtonText}>{t('verify')}</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[styles.downloadButton, styles.deleteButton]}
                                             onPress={() => handleDeleteFile(rom)}
                                         >
                                             <Ionicons name="trash-outline" size={20} color="#fff" />
-                                            <Text style={styles.downloadButtonText}>Elimina</Text>
+                                            <Text style={styles.downloadButtonText}>{t('delete')}</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -337,13 +337,13 @@ export default function GameDetailsScreen() {
                                         <View style={styles.downloadingContent}>
                                             <ActivityIndicator size="small" color="#fff" />
                                             <Text style={styles.downloadButtonText}>
-                                                Aggiunto alla coda
+                                                {t('addedToQueue')}
                                             </Text>
                                         </View>
                                     ) : (
                                         <View style={styles.downloadContent}>
                                             <Ionicons name="download-outline" size={20} color="#fff" />
-                                            <Text style={styles.downloadButtonText}>Scarica ROM</Text>
+                                            <Text style={styles.downloadButtonText}>{t('downloadRom')}</Text>
                                         </View>
                                     )}
                                 </TouchableOpacity>

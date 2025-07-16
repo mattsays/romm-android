@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { PublicRoute } from '../../components/ProtectedRoute';
 import { useLogin } from '../../hooks/useAuth';
+import { useTranslation } from '../../hooks/useTranslation';
 import { LoginCredentials, apiClient } from '../../services/api';
 
 export default function LoginScreen() {
@@ -26,6 +27,7 @@ export default function LoginScreen() {
     const [showUrlField, setShowUrlField] = useState<boolean>(false);
     const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'failed'>('checking');
     const { login, isLoading, error, clearError } = useLogin();
+    const { t } = useTranslation();
     const router = useRouter();
 
     // Load saved server URL on component mount
@@ -82,7 +84,7 @@ export default function LoginScreen() {
 
     const handleLogin = async () => {
         if (!credentials.username.trim() || !credentials.password.trim()) {
-            Alert.alert('Errore', 'Inserisci username e password');
+            Alert.alert(t('error'), t('enterUsernameAndPassword'));
             return;
         }
 
@@ -91,8 +93,8 @@ export default function LoginScreen() {
             await login(credentials);
             router.replace('/');
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Errore durante il login';
-            Alert.alert('Errore di login', errorMessage);
+            const errorMessage = error instanceof Error ? error.message : t('errorDuringLogin');
+            Alert.alert(t('loginError'), errorMessage);
         }
     };
 
@@ -105,21 +107,21 @@ export default function LoginScreen() {
                 <ScrollView contentContainerStyle={styles.scrollContainer}>
                     <View style={styles.formContainer}>
                         <Text style={styles.title}>RomM</Text>
-                        <Text style={styles.subtitle}>Accedi al tuo account</Text>
+                        <Text style={styles.subtitle}>{t('loginToAccount')}</Text>
 
                         {/* Connection Status */}
                         <View style={styles.connectionStatus}>
                             {connectionStatus === 'checking' && (
                                 <View style={styles.statusRow}>
                                     <ActivityIndicator size="small" color="#007AFF" />
-                                    <Text style={styles.statusText}>Verifica connessione...</Text>
+                                    <Text style={styles.statusText}>{t('verifyingConnection')}</Text>
                                 </View>
                             )}
                             {connectionStatus === 'connected' && (
                                 <View style={styles.statusRow}>
                                     <Text style={styles.statusIcon}>✓</Text>
                                     <Text style={[styles.statusText, styles.successText]}>
-                                        Connesso al server RomM
+                                        {t('connectedToServer')}
                                     </Text>
                                 </View>
                             )}
@@ -127,7 +129,7 @@ export default function LoginScreen() {
                                 <View style={styles.statusRow}>
                                     <Text style={styles.statusIcon}>⚠️</Text>
                                     <Text style={[styles.statusText, styles.errorText]}>
-                                        Impossibile connettersi al server
+                                        {t('unableToConnectToServer')}
                                     </Text>
                                 </View>
                             )}
@@ -139,13 +141,13 @@ export default function LoginScreen() {
                             onPress={() => setShowUrlField(!showUrlField)}
                         >
                             <Text style={styles.urlToggleText}>
-                                {showUrlField ? '▼' : '▶'} Configura URL Server
+                                {showUrlField ? '▼' : '▶'} {t('configureServerUrl')}
                             </Text>
                         </TouchableOpacity>
 
                         {showUrlField && (
                             <View style={styles.inputContainer}>
-                                <Text style={styles.label}>URL Server RomM</Text>
+                                <Text style={styles.label}>{t('serverUrl')}</Text>
                                 <TextInput
                                     style={styles.input}
                                     value={serverUrl}
@@ -158,7 +160,7 @@ export default function LoginScreen() {
                                     keyboardType="url"
                                 />
                                 <Text style={styles.urlHint}>
-                                    Inserisci l'URL completo del tuo server RomM (es: http://192.168.1.100:8080)
+                                    {t('serverUrlHint')}
                                 </Text>
                             </View>
                         )}
@@ -170,12 +172,12 @@ export default function LoginScreen() {
                         )}
 
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Username</Text>
+                            <Text style={styles.label}>{t('username')}</Text>
                             <TextInput
                                 style={styles.input}
                                 value={credentials.username}
                                 onChangeText={(text) => setCredentials(prev => ({ ...prev, username: text }))}
-                                placeholder="Inserisci il tuo username"
+                                placeholder={t('enterUsername')}
                                 placeholderTextColor="#666"
                                 autoCapitalize="none"
                                 autoCorrect={false}
@@ -184,12 +186,12 @@ export default function LoginScreen() {
                         </View>
 
                         <View style={styles.inputContainer}>
-                            <Text style={styles.label}>Password</Text>
+                            <Text style={styles.label}>{t('password')}</Text>
                             <TextInput
                                 style={styles.input}
                                 value={credentials.password}
                                 onChangeText={(text) => setCredentials(prev => ({ ...prev, password: text }))}
-                                placeholder="Inserisci la tua password"
+                                placeholder={t('enterPassword')}
                                 placeholderTextColor="#666"
                                 secureTextEntry
                                 autoCapitalize="none"
@@ -206,7 +208,7 @@ export default function LoginScreen() {
                             {isLoading ? (
                                 <ActivityIndicator color="#fff" />
                             ) : (
-                                <Text style={styles.loginButtonText}>Accedi</Text>
+                                <Text style={styles.loginButtonText}>{t('login')}</Text>
                             )}
                         </TouchableOpacity>
                     </View>

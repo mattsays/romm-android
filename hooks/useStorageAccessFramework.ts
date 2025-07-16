@@ -1,8 +1,11 @@
 import * as FileSystem from 'expo-file-system';
 
-import { Alert, Platform } from 'react-native';
+import { Alert } from 'react-native';
+import { useTranslation } from './useTranslation';
 
 export const useStorageAccessFramework = () => {
+    const { t } = useTranslation();
+
     // Function to request directory permissions using SAF
     const requestDirectoryPermissions = async (): Promise<string | null> => {
         try {
@@ -10,18 +13,18 @@ export const useStorageAccessFramework = () => {
             const result = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
 
             if (result.granted) {
-                console.log('Permessi della cartella concessi:', result.directoryUri);
+                console.log('Directory permissions granted:', result.directoryUri);
                 return result.directoryUri;
             } else {
-                console.warn('Permessi della cartella non concessi');
+                console.warn('Directory permissions not granted');
                 Alert.alert(
-                    'Permessi non concessi',
-                    'Non hai concesso i permessi per accedere alla cartella. Per favore, riprova.',
-                    [{ text: 'OK' }]
+                    t('permissionsNotGranted'),
+                    t('permissionsNotGrantedMessage'),
+                    [{ text: t('ok') }]
                 );
             }
         } catch (error) {
-            console.error('Errore nel richiedere i permessi della cartella:', error);
+            console.error('Error requesting directory permissions:', error);
         }
 
         return null;
@@ -32,7 +35,7 @@ export const useStorageAccessFramework = () => {
         try {
             return await FileSystem.StorageAccessFramework.readDirectoryAsync(folderUri);
         } catch (error) {
-            console.error('Errore nella lettura del contenuto della cartella:', error);
+            console.error('Error reading directory contents:', error);
         }
 
         return [];
@@ -43,7 +46,7 @@ export const useStorageAccessFramework = () => {
         try {
             await FileSystem.StorageAccessFramework.readDirectoryAsync(folderUri);
         } catch (error) {
-            console.error('Errore nel controllo dei permessi:', error);
+            console.error('Error checking permissions:', error);
             return false;
         }
 

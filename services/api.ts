@@ -4,6 +4,8 @@ import * as SecureStore from 'expo-secure-store';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080';
 
+
+
 // Authentication types
 export interface LoginCredentials {
     username: string;
@@ -54,6 +56,24 @@ export interface Platform {
     sgdb_id?: number;
     logo_path?: string;
     rom_count: number;
+}
+
+export type CollectionType = 'collection' | 'franchise' | 'genre' | 'company' | 'mode';
+
+
+export interface Collection {
+    id: number;
+    name: string;
+    type: CollectionType;
+    description?: string;
+    path_covers_small: string[];
+    path_covers_large: string[];
+    rom_ids: number[];
+    rom_count: number;
+    created_at: string;
+    updated_at: string;
+    is_virtual: boolean;
+
 }
 
 export interface RomFile {
@@ -238,6 +258,50 @@ class ApiClient {
 
     async getPlatform(platformId: number): Promise<Platform> {
         return this.request<Platform>(`/api/platforms/${platformId}`);
+    }
+
+    async getUserCollections(): Promise<Collection[]> {
+        return this.request<Collection[]>('/api/collections');
+    }
+
+    async getVirtualCollections(type: CollectionType = 'collection'): Promise<Collection[]> {
+        return this.request<Collection[]>(`/api/collections/virtual?type=${type}`);
+    }
+
+    async getAllVirtualCollections(): Promise<Record<CollectionType, Collection[]>> {
+        const types: CollectionType[] = ['collection', 'franchise', 'genre', 'company', 'mode'];
+        const collections: Record<CollectionType, Collection[]> = {} as Record<CollectionType, Collection[]>;
+
+        for (const type of types) {
+            collections[type] = await this.getVirtualCollections(type);
+        }
+
+        return collections;
+    }
+
+
+    async getCollection(collectionId: string, isVirtual: boolean): Promise<Collection> {
+
+        if (isVirtual) {
+            return this.request<Collection>(`/api/collections/virtual/${collectionId}`);
+        }
+
+        return this.request<Collection>(`/api/collections/${collectionId}`);
+    }
+
+    async getRomsByCollection(collectionId: string, isVirtual: boolean): Promise<Rom[]> {
+        if (isVirtual) {
+            const response = await this.request<ItemsResponse<Rom>>(`/api/roms?virtual_collection_id=${collectionId}`);
+            return response.items;
+        }
+
+        const response = await this.request<ItemsResponse<Rom>>(`/api/roms?collection_id=${collectionId}`);
+        return response.items;
+    }
+
+    async getRomsRecentlyAdded(): Promise<Rom[]> {
+        const response = await this.request<ItemsResponse<Rom>>('/api/roms?order_by=id&order_dir=desc&limit=15');
+        return response.items;
     }
 
     async getRomsByPlatform(platformId: number): Promise<Rom[]> {

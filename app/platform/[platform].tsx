@@ -5,13 +5,14 @@ import {
     ActivityIndicator,
     Alert,
     Dimensions,
+    FlatList,
     Image,
+    Pressable,
     RefreshControl,
-    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { useDownload } from '../../contexts/DownloadContext';
 import { usePlatformFolders } from '../../hooks/usePlatformFolders';
@@ -19,7 +20,7 @@ import { useRomFileSystem } from '../../hooks/useRomFileSystem';
 import { usePlatform, useRoms } from '../../hooks/useRoms';
 import { useStorageAccessFramework } from '../../hooks/useStorageAccessFramework';
 import { useTranslation } from '../../hooks/useTranslation';
-import { apiClient, Rom } from '../../services/api';
+import { Rom } from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -29,7 +30,7 @@ export default function PlatformScreen() {
     const { t } = useTranslation();
     const { roms, loading: romsLoading, error: romsError, fetchRomsByPlatform } = useRoms();
     const { platform: currentPlatform, loading: platformLoading, error: platformError, fetchPlatform } = usePlatform();
-    const { addToQueue, isDownloading } = useDownload();
+    const { addToQueue, isDownloading, completedDownloads } = useDownload();
     const { getPlatformFolder, savePlatformFolder, hasPlatformFolder } = usePlatformFolders();
     const { checkMultipleRoms, isRomDownloaded, isCheckingRom } = useRomFileSystem();
     const { requestDirectoryPermissions } = useStorageAccessFramework();
@@ -39,9 +40,7 @@ export default function PlatformScreen() {
 
     const platformId = Number(platform);
 
-    const selectedPlatform = currentPlatform?.name ||
-        t(`platformNames.${currentPlatform?.slug as keyof typeof import('../../locales/it.json').platformNames}`) ||
-        t('unknownPlatform');
+    const selectedPlatform = currentPlatform?.name;
 
     useEffect(() => {
         navigation.setOptions({
@@ -96,32 +95,38 @@ export default function PlatformScreen() {
         const currentFolder = await getPlatformFolder(currentPlatform.slug);
 
         Alert.alert(
-            hasFolder ? 'Cambia Cartella' : 'Seleziona Cartella',
+            hasFolder ? t('changeFolderTitle') : t('selectFolderTitle'),
             hasFolder
-                ? `Cartella attuale: ${currentFolder?.folderName}\n\nVuoi selezionare una nuova cartella per ${currentPlatform.name}?`
-                : `Per scaricare le ROM di ${currentPlatform.name}, devi selezionare una cartella dove salvare i file.`,
+                ? `${t('currentFolder', { folderName: currentFolder?.folderName || '' })}\n\n${t('selectNewFolderQuestion', { platform: currentPlatform.name })}`
+                : t('selectFolderToDownload', { platform: currentPlatform.name }),
             [
                 {
-                    text: hasFolder ? 'Annulla' : 'Non ora',
+                    text: hasFolder ? t('cancel') : t('notNow'),
                     style: 'cancel'
                 },
                 {
-                    text: hasFolder ? 'Cambia Cartella' : 'Seleziona Cartella',
+                    text: hasFolder ? t('changeFolder') : t('selectFolder'),
                     onPress: async () => {
                         try {
                             const folderUri = await requestDirectoryPermissions();
                             if (folderUri) {
                                 await savePlatformFolder(currentPlatform.slug, currentPlatform.name, folderUri);
+                                if (roms.length > 0) {
+                                    if (currentPlatform) {
+                                        const folder = await getPlatformFolder(currentPlatform.slug);
+                                        await checkMultipleRoms(roms, folder?.folderUri || '');
+                                    }
+                                }
                                 Alert.alert(
-                                    'Cartella Configurata',
-                                    `Cartella configurata con successo per ${currentPlatform.name}!`
+                                    t('folderConfigured'),
+                                    t('folderConfiguredSuccessfully', { platform: currentPlatform.name })
                                 );
                             }
                         } catch (error) {
                             console.error('Error selecting folder:', error);
                             Alert.alert(
-                                'Errore',
-                                'Errore durante la selezione della cartella. Puoi riprovarci in seguito.',
+                                t('error'),
+                                t('errorSelectingFolder'),
                                 [{ text: 'OK' }]
                             );
                         }
@@ -144,8 +149,8 @@ export default function PlatformScreen() {
         } catch (error) {
             console.error('Error refreshing data:', error);
             Alert.alert(
-                'Errore',
-                'Errore durante l\'aggiornamento dei dati. Riprova più tardi.',
+                t('error'),
+                t('errorRefreshingData'),
                 [{ text: 'OK' }]
             );
         } finally {
@@ -155,7 +160,7 @@ export default function PlatformScreen() {
 
     const handleDownloadAll = async () => {
         if (!currentPlatform || roms.length === 0) {
-            Alert.alert('Errore', 'Nessuna ROM disponibile per il download.');
+            Alert.alert(t('error'), t('noRomsAvailable'));
             return;
         }
 
@@ -163,11 +168,11 @@ export default function PlatformScreen() {
         const platformFolder = await getPlatformFolder(currentPlatform.slug);
         if (!platformFolder) {
             Alert.alert(
-                'Cartella non selezionata',
-                `Per scaricare le ROM di ${currentPlatform.name}, devi prima selezionare una cartella.`,
+                t('folderNotSelected'),
+                t('selectFolderFirst', { platform: currentPlatform.name }),
                 [
-                    { text: 'Annulla', style: 'cancel' },
-                    { text: 'Seleziona Cartella', onPress: () => showFolderSelectionDialog() }
+                    { text: t('cancel'), style: 'cancel' },
+                    { text: t('selectFolder'), onPress: () => showFolderSelectionDialog() }
                 ]
             );
             return;
@@ -177,17 +182,17 @@ export default function PlatformScreen() {
         const romsToDownload = roms.filter(rom => !isDownloading(rom.id) && !isRomDownloaded(rom.id));
 
         if (romsToDownload.length === 0) {
-            Alert.alert('Info', 'Tutte le ROM sono già state scaricate o sono in download.');
+            Alert.alert(t('info'), t('allRomsDownloaded'));
             return;
         }
 
         Alert.alert(
-            'Conferma Download',
-            `Vuoi scaricare ${romsToDownload.length} ROM per ${currentPlatform.name}?`,
+            t('confirmDownload'),
+            t('downloadAllRomsQuestion', { count: romsToDownload.length.toString(), platform: currentPlatform.name }),
             [
-                { text: 'Annulla', style: 'cancel' },
+                { text: t('cancel'), style: 'cancel' },
                 {
-                    text: 'Scarica Tutto',
+                    text: t('downloadAll'),
                     onPress: async () => {
                         setIsDownloadingAll(true);
                         try {
@@ -197,12 +202,12 @@ export default function PlatformScreen() {
                             });
 
                             Alert.alert(
-                                'Download Avviato',
-                                `${romsToDownload.length} ROM aggiunte alla coda di download.`
+                                t('downloadAllStarted'),
+                                t('romsAddedToQueue', { count: romsToDownload.length.toString() })
                             );
                         } catch (error) {
                             console.error('Error adding ROMs to queue:', error);
-                            Alert.alert('Errore', 'Errore durante l\'aggiunta delle ROM alla coda di download.');
+                            Alert.alert(t('error'), t('errorAddingToQueue'));
                         } finally {
                             setIsDownloadingAll(false);
                         }
@@ -217,53 +222,98 @@ export default function PlatformScreen() {
         const error = romsError || platformError;
         if (error) {
             Alert.alert(
-                'Errore',
-                'Impossibile caricare i dati per questa piattaforma. Controlla la connessione di rete.',
-                [{ text: 'OK' }]
+                t('error'),
+                t('unableToLoadPlatformData'),
+                [{ text: t('ok') }]
             );
         }
     }, [romsError, platformError]);
 
-    const GameCard = ({ rom }: { rom: Rom }) => (
-        <TouchableOpacity
-            style={styles.gameCard}
-            activeOpacity={0.8}
-            onPress={() => router.push(`/game/${rom.id}`)}
-        >
-            <View style={styles.gameImageContainer}>
-                <Image
-                    source={{
-                        uri: rom.url_cover || `${apiClient.baseUrl}/assets/isotipo.png`
-                    }}
-                    style={styles.gameImage}
-                />
-                {isRomDownloaded(rom.id) && (
-                    <View style={styles.completedBadge}>
-                        <Ionicons name="checkmark-circle" size={24} color="#34C759" />
-                    </View>
-                )}
-                {isCheckingRom(rom.id) && (
-                    <View style={styles.checkingBadge}>
-                        <ActivityIndicator size={16} color="#FF9500" />
-                    </View>
-                )}
-                {isDownloading(rom.id) && (
-                    <View style={styles.downloadingBadge}>
-                        <Ionicons name="download" size={20} color="#FFFFFF" />
-                    </View>
-                )}
-            </View>
-            <Text style={styles.gameTitle} numberOfLines={2}>
-                {rom.name || rom.fs_name}
-            </Text>
-        </TouchableOpacity>
-    );
+    const handleDownload = async (rom: Rom) => {
+        if (!currentPlatform) return;
+
+        // Get the platform folder
+        const platformFolder = await getPlatformFolder(currentPlatform.slug);
+        if (!platformFolder) {
+            Alert.alert(
+                t('folderNotSelected'),
+                t('selectFolderForDownload', { platform: currentPlatform.name }),
+                [
+                    { text: t('cancel'), style: 'cancel' },
+                    { text: t('selectFolder'), onPress: () => showFolderSelectionDialog() }
+                ]
+            );
+            return;
+        }
+
+        addToQueue(rom, platformFolder);
+    };
+
+    const GameCard = ({ rom }: { rom: Rom & { isEmpty?: boolean } }) => {
+
+        if (rom.isEmpty) {
+            return <View style={styles.gameCard} />;
+        }
+
+        const hasImage = rom.url_cover && rom.url_cover.trim() !== '';
+
+        return (
+            <Pressable
+                style={[styles.gameCard]}
+                onPress={() => router.push(`/game/${rom.id}`)}
+            >
+                <View style={styles.gameImageContainer}>
+                    {hasImage ? (
+                        <Image
+                            source={{ uri: rom.url_cover }}
+                            style={styles.gameImage}
+                        />
+                    ) : (
+                        <View style={styles.placeholderContainer}>
+                            <Ionicons name="help-outline" size={64} color="#666" />
+                            <Text style={styles.gameTitle} numberOfLines={2}>
+                                {rom.name || rom.fs_name}
+                            </Text>
+                        </View>
+                    )}
+                    {isRomDownloaded(rom.id) && (
+                        <View style={styles.completedBadge}>
+                            <Ionicons name="checkmark-circle" size={24} color="#34C759" />
+                        </View>
+                    )}
+                    {isCheckingRom(rom.id) && (
+                        <View style={styles.checkingBadge}>
+                            <ActivityIndicator size={16} color="#FF9500" />
+                        </View>
+                    )}
+                    {isDownloading(rom.id) && (
+                        <View style={styles.downloadingBadge}>
+                            <Ionicons name="download" size={20} color="#FFFFFF" />
+                        </View>
+                    )}
+
+                    {/* Download Button - Only show if not downloaded and not downloading */}
+                    {!isRomDownloaded(rom.id) && !isDownloading(rom.id) && (
+                        <View style={styles.romOverlay}>
+                            <TouchableOpacity
+                                style={styles.downloadButton}
+                                onPress={() => handleDownload(rom)}
+                            >
+                                <Ionicons name="download-outline" size={16} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
+
+            </Pressable>
+        );
+    };
 
     if (romsLoading || platformLoading) {
         return (
             <View style={[styles.container, styles.centered]}>
                 <ActivityIndicator size="large" color="#fff" />
-                <Text style={styles.loadingText}>Caricamento...</Text>
+                <Text style={styles.loadingText}>{t('loading')}</Text>
             </View>
         );
     }
@@ -271,13 +321,28 @@ export default function PlatformScreen() {
     if (!platformId || isNaN(platformId) || !currentPlatform) {
         return (
             <View style={[styles.container, styles.centered]}>
-                <Text style={styles.errorText}>Piattaforma non trovata</Text>
+                <Text style={styles.errorText}>{t('platformNotFound')}</Text>
             </View>
         );
     }
 
     // Calculate available ROMs to download
     const availableToDownload = roms.filter(rom => !isDownloading(rom.id) && !isRomDownloaded(rom.id)).length;
+
+    // Prepare data for FlatList with empty items to fill last row
+    const ITEMS_PER_ROW = 5;
+    const prepareGridData = (data: Rom[]) => {
+        const totalItems = data.length;
+        const remainder = totalItems % ITEMS_PER_ROW;
+        if (remainder === 0) return data;
+
+        const emptyItems = ITEMS_PER_ROW - remainder;
+        const paddedData = [...data];
+        for (let i = 0; i < emptyItems; i++) {
+            paddedData.push({ id: `empty-${i}`, isEmpty: true } as any);
+        }
+        return paddedData;
+    };
 
     return (
         <View style={styles.container}>
@@ -288,7 +353,7 @@ export default function PlatformScreen() {
                         <Ionicons name="arrow-back-outline" size={24} color="#fff" />
                     </TouchableOpacity>
                     <View style={styles.headerLeft}>
-                        <Text style={styles.headerTitle}>{currentPlatform?.name || 'Piattaforma sconosciuta'}</Text>
+                        <Text style={styles.headerTitle}>{currentPlatform?.name || t('unknownPlatform')}</Text>
                     </View>
                     <View style={styles.headerButtons}>
                         <TouchableOpacity
@@ -321,8 +386,13 @@ export default function PlatformScreen() {
             </View>
 
             {/* Games Grid */}
-            <ScrollView
-                style={styles.gamesContainer}
+            <FlatList
+                data={prepareGridData(roms)}
+                renderItem={({ item }) => <GameCard rom={item} />}
+                keyExtractor={(item) => item.id.toString()}
+                numColumns={5}
+                columnWrapperStyle={styles.row}
+                contentContainerStyle={styles.gamesContainer}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl
@@ -333,19 +403,15 @@ export default function PlatformScreen() {
                         progressBackgroundColor="#333"
                     />
                 }
-            >
-                <View style={styles.gamesGrid}>
-                    {roms.map((rom) => (
-                        <GameCard key={rom.id} rom={rom} />
-                    ))}
-                    {roms.length === 0 && !romsLoading && !platformLoading && (
+                ListEmptyComponent={
+                    !romsLoading && !platformLoading ? (
                         <View style={styles.emptyContainer}>
                             <Ionicons name="game-controller-outline" size={64} color="#666" />
-                            <Text style={styles.emptyText}>Nessuna ROM trovata per questa piattaforma</Text>
+                            <Text style={styles.emptyText}>{t('noRomsFoundForPlatform')}</Text>
                         </View>
-                    )}
-                </View>
-            </ScrollView>
+                    ) : null
+                }
+            />
         </View>
     );
 }
@@ -516,31 +582,35 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     gamesContainer: {
-        flex: 1,
         paddingHorizontal: 20,
+        paddingBottom: 20,
+    },
+    row: {
+        justifyContent: 'space-between',
+        paddingHorizontal: 0,
     },
     gamesGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-start',
         paddingBottom: 20,
+        gap: 10,
     },
     gameCard: {
-        width: (width - 60) / 5,
-        marginBottom: 20,
+        width: 150, // Adjusted for FlatList padding
+        marginBottom: 30,
     },
     gameImageContainer: {
         position: 'relative',
         width: '100%',
-        height: 120,
-        marginBottom: 8,
+        height: 200,
     },
     gameImage: {
         width: '100%',
-        height: 120,
+        height: "100%",
         borderRadius: 12,
         backgroundColor: '#333',
-        resizeMode: 'contain',
+        objectFit: 'cover',
     },
     newBadge: {
         position: 'absolute',
@@ -607,11 +677,41 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: 'bold',
     },
+    placeholderContainer: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#222',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 8,
+    },
+    placeholderTitle: {
+        color: '#ccc',
+        fontSize: 10,
+        fontWeight: '500',
+        textAlign: 'center',
+        lineHeight: 12,
+        marginTop: 4,
+    },
     gameTitle: {
         color: '#fff',
         fontSize: 14,
         fontWeight: '500',
         textAlign: 'center',
         lineHeight: 18,
+        marginTop: 8,
+    },
+    romOverlay: {
+        position: 'absolute',
+        bottom: 8,
+        right: 8,
+    },
+    downloadButton: {
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        borderRadius: 16,
+        width: 32,
+        height: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

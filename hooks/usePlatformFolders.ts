@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useStorageAccessFramework } from './useStorageAccessFramework';
 
 export interface PlatformFolder {
@@ -10,29 +10,18 @@ export interface PlatformFolder {
 }
 
 export const usePlatformFolders = () => {
-    const [loading, setLoading] = useState(true);
-    const [isReady, setIsReady] = useState(false);
     const { checkDirectoryPermissions } = useStorageAccessFramework();
+    const [platformFolders, setPlatformFolders] = useState<PlatformFolder[]>([]);
 
     const STORAGE_KEY = 'platformFolders';
 
     // // Load platform folders from AsyncStorage when the hook is initialized
-    // useEffect(() => {
-    //     loadPlatformFolders()
-    // }, []);
-
-
-    const savePlatformFoldersToStorage = async (folders: Record<string, PlatformFolder>) => {
-        try {
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(folders));
-        } catch (error) {
-            console.error('Errore nel salvare le cartelle delle piattaforme:', error);
-            throw error;
-        }
-    };
+    useEffect(() => {
+        loadPlatformFolders();
+    }, []);
 
     // Function to save a folder for a specific platform
-    const savePlatformFolder = async(
+    const savePlatformFolder = async (
         platformSlug: string,
         platformName: string,
         folderUri: string
@@ -47,21 +36,66 @@ export const usePlatformFolders = () => {
                 folderName
             };
 
-            await AsyncStorage.setItem(`${STORAGE_KEY}_${platformSlug}` , JSON.stringify(newFolder));
-            
-            console.log(`Cartella per la piattaforma ${platformSlug} salvata con successo:`, newFolder);
+            await AsyncStorage.setItem(`${STORAGE_KEY}_${platformSlug}`, JSON.stringify(newFolder));
+
+            // Add folder to the list of configured platforms
+            const allFolders = await AsyncStorage.getItem(STORAGE_KEY);
+            const folders = allFolders ? JSON.parse(allFolders) : [];
+
+            // Check if the folder already exists
+            const existingIndex = folders.findIndex((folder: PlatformFolder) => folder.platformSlug === platformSlug);
+            if (existingIndex !== -1) {
+                // Update existing folder
+                folders[existingIndex] = newFolder;
+            } else {
+                // Add new folder
+                folders.push(newFolder);
+            }
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(folders));
+
+            console.log(`Folder for platform ${platformSlug} saved successfully:`, newFolder);
         } catch (error) {
-            console.error(`Errore nel salvare la cartella per la piattaforma ${platformSlug}:`, error);
+            console.error(`Error saving folder for platform ${platformSlug}:`, error);
             throw error;
-        } 
+        }
     };
 
     // Function to remove a platform folder
     const removePlatformFolder = async (platformSlug: string) => {
         try {
             await AsyncStorage.removeItem(`${STORAGE_KEY}_${platformSlug}`);
+
+            // Remove from the list of configured platforms
+            const allFolders = await AsyncStorage.getItem(STORAGE_KEY);
+            const folders = allFolders ? JSON.parse(allFolders) : [];
+            const updatedFolders = folders.filter((folder: PlatformFolder) => folder.platformSlug !== platformSlug);
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedFolders));
         } catch (error) {
-            console.error(`Errore nella rimozione della cartella per la piattaforma ${platformSlug}:`, error);
+            console.error(`Error removing folder for platform ${platformSlug}:`, error);
+            throw error;
+        }
+    };
+
+    // Function to remove all platform folders
+    const removeAllPlatformFolders = async () => {
+        try {
+            const allFolders = await AsyncStorage.getItem(STORAGE_KEY);
+            const folders = allFolders ? JSON.parse(allFolders) : [];
+
+            // Remove each platform folder individually
+            for (const folder of folders) {
+                await AsyncStorage.removeItem(`${STORAGE_KEY}_${folder.platformSlug}`);
+            }
+
+            // Clear the main list
+            await AsyncStorage.removeItem(STORAGE_KEY);
+
+            // Update state
+            setPlatformFolders([]);
+
+            console.log('All platform folders removed successfully');
+        } catch (error) {
+            console.error('Error removing all platform folders:', error);
             throw error;
         }
     };
@@ -88,12 +122,12 @@ export const usePlatformFolders = () => {
         try {
             return await checkDirectoryPermissions(folder.folderUri);
         } catch (error) {
-            console.error(`Errore nel controllo dell'accesso alla cartella per la piattaforma ${platformSlug}:`, error);
+            console.error(`Error checking folder access for platform ${platformSlug}:`, error);
             return false;
         }
     };
 
-    // Funzione per estrarre il nome della cartella dall'URI
+    // Function to extract folder name from URI
     const extractFolderNameFromUri = (uri: string): string => {
         try {
             const decodedUri = decodeURIComponent(uri);
@@ -110,35 +144,30 @@ export const usePlatformFolders = () => {
         }
     };
 
-    // Funzione per attendere che i dati siano pronti
-    const waitForReady = (): Promise<void> => {
-        return new Promise((resolve) => {
-            if (isReady) {
-                resolve();
-                return;
+    const loadPlatformFolders = useCallback(async () => {
+        try {
+            const allFolders = await AsyncStorage.getItem(STORAGE_KEY);
+            if (allFolders) {
+                setPlatformFolders(JSON.parse(allFolders));
+            } else {
+                setPlatformFolders([]);
             }
-
-            const checkReady = () => {
-                if (isReady) {
-                    resolve();
-                } else {
-                    setTimeout(checkReady, 50);
-                }
-            };
-
-            checkReady();
-        });
-    };
+        } catch (error) {
+            console.error('Error loading platform folders:', error);
+            throw error;
+        }
+    }, []);
 
     return {
-        loading,
-        isReady,
         // loadPlatformFolders,
         savePlatformFolder,
         removePlatformFolder,
         getPlatformFolder,
         hasPlatformFolder,
         checkPlatformFolderAccess,
-        waitForReady,
+        loadPlatformFolders,
+        platformFolders,
+        setPlatformFolders,
+        removeAllPlatformFolders
     };
 };

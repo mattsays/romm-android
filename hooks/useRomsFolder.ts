@@ -7,7 +7,7 @@ export const useRomsFolder = () => {
     const [loading, setLoading] = useState(true);
     const { readDirectoryContents, checkDirectoryPermissions } = useStorageAccessFramework();
 
-    // Carica la cartella delle ROMs al primo avvio
+    // Load ROMs folder on first launch
     useEffect(() => {
         loadRomsFolderInfo();
     }, []);
@@ -18,62 +18,62 @@ export const useRomsFolder = () => {
             const savedFolderUri = await AsyncStorage.getItem('romsFolderUri');
 
             if (savedFolderUri) {
-                // Verifica se abbiamo ancora i permessi per questa cartella
+                // Check if we still have permissions for this folder
                 const hasPermissions = await checkDirectoryPermissions(savedFolderUri);
                 if (hasPermissions) {
                     setRomsFolderUri(savedFolderUri);
                 } else {
-                    // Rimuovi la cartella salvata se non abbiamo più i permessi
+                    // Remove saved folder if we no longer have permissions
                     await AsyncStorage.removeItem('romsFolderUri');
                     setRomsFolderUri(null);
                 }
             }
         } catch (error) {
-            console.error('Errore nel caricare la cartella delle ROMs:', error);
+            console.error('Error loading ROMs folder:', error);
             setRomsFolderUri(null);
         } finally {
             setLoading(false);
         }
     };
 
-    // Funzione per salvare una nuova cartella delle ROMs
+    // Function to save a new ROMs folder
     const saveRomsFolderUri = async (folderUri: string) => {
         try {
             console.log('Saving ROM folder URI:', folderUri);
             await AsyncStorage.setItem('romsFolderUri', folderUri);
             setRomsFolderUri(folderUri);
         } catch (error) {
-            console.error('Errore nel salvare la cartella delle ROMs:', error);
+            console.error('Error saving ROMs folder:', error);
             throw error;
         }
     };
 
-    // Funzione per rimuovere la cartella delle ROMs
+    // Function to remove ROMs folder
     const clearRomsFolderInfo = async () => {
         try {
             await AsyncStorage.removeItem('romsFolderUri');
             setRomsFolderUri(null);
         } catch (error) {
-            console.error('Errore nella rimozione della cartella delle ROMs:', error);
+            console.error('Error removing ROMs folder:', error);
             throw error;
         }
     };
 
-    // Funzione per leggere il contenuto della cartella delle ROMs
+    // Function to read ROMs folder contents
     const readRomsDirectoryContents = async (): Promise<string[]> => {
         if (!romsFolderUri) {
-            throw new Error('Nessuna cartella delle ROMs configurata');
+            throw new Error('No ROMs folder configured');
         }
 
         try {
             return await readDirectoryContents(romsFolderUri);
         } catch (error) {
-            console.error('Errore nella lettura del contenuto della cartella delle ROMs:', error);
+            console.error('Error reading ROMs folder contents:', error);
             throw error;
         }
     };
 
-    // Funzione per verificare se la cartella è ancora accessibile
+    // Function to check if folder is still accessible
     const checkRomsFolderAccess = async (): Promise<boolean> => {
         if (!romsFolderUri) {
             return false;
@@ -82,22 +82,22 @@ export const useRomsFolder = () => {
         try {
             return await checkDirectoryPermissions(romsFolderUri);
         } catch (error) {
-            console.error('Errore nel controllo dell\'accesso alla cartella delle ROMs:', error);
+            console.error('Error checking ROMs folder access:', error);
             return false;
         }
     };
 
-    // Funzione per estrarre il nome della cartella dall'URI per la visualizzazione
+    // Function to extract folder name from URI for display
     const extractFolderNameFromUri = (uri: string): string => {
         try {
-            // Prova a decodificare l'URI per ottenere un nome leggibile
+            // Try to decode URI to get a readable name
             const decodedUri = decodeURIComponent(uri);
 
-            // Estrae l'ultima parte dell'URI come nome della cartella
+            // Extract the last part of the URI as folder name
             const parts = decodedUri.split('/');
             const lastPart = parts[parts.length - 1];
 
-            // Se l'ultima parte contiene %3A, prova a pulirla
+            // If the last part contains %3A, try to clean it
             if (lastPart.includes('%3A')) {
                 return lastPart.split('%3A').pop() || 'Selected Folder';
             }

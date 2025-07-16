@@ -2,24 +2,24 @@ import { Redirect } from 'expo-router';
 import React, { ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface ProtectedRouteProps {
     children: ReactNode;
     fallback?: ReactNode;
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
-    children,
-    fallback
-}) => {
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = (props) => {
+    const { children, fallback } = props;
     const { isAuthenticated, isLoading, user } = useAuth();
+    const { t } = useTranslation();
 
     if (isLoading) {
         return fallback || (
             <View style={styles.container}>
                 <ActivityIndicator size="large" color="#007AFF" />
                 <Text style={styles.loadingText}>
-                    Verificando autenticazione...
+                    {t('verifyingAuthentication')}
                 </Text>
             </View>
         );
@@ -29,26 +29,33 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         return <Redirect href="/auth/login" />;
     }
 
-    return <>{children}</>;
+    // Ensure children is valid before rendering
+    if (!children) {
+        return null;
+    }
+
+    return (
+        <View style={{ flex: 1 }}>
+            {children}
+        </View>
+    );
 };
 
 interface AdminRouteProps extends ProtectedRouteProps {
     adminFallback?: ReactNode;
 }
 
-export const AdminRoute: React.FC<AdminRouteProps> = ({
-    children,
-    fallback,
-    adminFallback
-}) => {
+export const AdminRoute: React.FC<AdminRouteProps> = (props) => {
+    const { children, fallback, adminFallback } = props;
     const { isAuthenticated, isLoading, user } = useAuth();
+    const { t } = useTranslation();
 
     if (isLoading) {
         return fallback || (
             <View style={styles.container}>
                 <ActivityIndicator size="large" color="#007AFF" />
                 <Text style={styles.loadingText}>
-                    Verificando autorizzazioni...
+                    {t('verifyingPermissions')}
                 </Text>
             </View>
         );
@@ -62,13 +69,21 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({
         return adminFallback || (
             <View style={styles.container}>
                 <Text style={styles.errorText}>
-                    Accesso negato. Sono richiesti i privilegi di amministratore.
+                    {t('accessDenied')}
                 </Text>
             </View>
         );
     }
 
-    return <>{children}</>;
+    if (!children) {
+        return null;
+    }
+
+    return (
+        <View style={{ flex: 1 }}>
+            {children}
+        </View>
+    );
 };
 
 import type { RedirectProps } from 'expo-router';
@@ -78,18 +93,17 @@ interface PublicRouteProps {
     redirectTo?: RedirectProps['href'];
 }
 
-export const PublicRoute: React.FC<PublicRouteProps> = ({
-    children,
-    redirectTo = '/'
-}) => {
+export const PublicRoute: React.FC<PublicRouteProps> = (props) => {
+    const { children, redirectTo = '/' } = props;
     const { isAuthenticated, isLoading } = useAuth();
+    const { t } = useTranslation();
 
     if (isLoading) {
         return (
             <View style={styles.container}>
                 <ActivityIndicator size="large" color="#007AFF" />
                 <Text style={styles.loadingText}>
-                    Caricamento...
+                    {t('loading')}
                 </Text>
             </View>
         );
@@ -99,7 +113,15 @@ export const PublicRoute: React.FC<PublicRouteProps> = ({
         return <Redirect href={redirectTo} />;
     }
 
-    return <>{children}</>;
+    if (!children) {
+        return null;
+    }
+
+    return (
+        <View style={{ flex: 1 }}>
+            {children}
+        </View>
+    );
 };
 
 const styles = StyleSheet.create({

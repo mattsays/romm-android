@@ -8,8 +8,10 @@ interface UseRomsState {
 }
 
 interface UseRomsReturn extends UseRomsState {
+    recentlyAddedRoms: Rom[];
     fetchRomsByPlatform: (platformId: number) => Promise<void>;
     refreshRoms: () => Promise<void>;
+    fetchRecentlyAddedRoms: () => Promise<Rom[]>;
     clearRoms: () => void;
 }
 
@@ -19,6 +21,8 @@ export function useRoms(): UseRomsReturn {
         loading: false,
         error: null,
     });
+
+    const [recentlyAddedRoms, setRecentlyAddedRoms] = useState<Rom[]>([]);
 
     const [currentPlatformId, setCurrentPlatformId] = useState<number | null>(null);
 
@@ -58,10 +62,23 @@ export function useRoms(): UseRomsReturn {
         setCurrentPlatformId(null);
     }, []);
 
+    const fetchRecentlyAddedRoms = useCallback(async () => {
+        try {
+            const roms = await apiClient.getRomsRecentlyAdded();
+            setRecentlyAddedRoms(roms);
+            return roms;
+        } catch (error) {
+            console.error('Error fetching recently added ROMs:', error);
+            return [];
+        }
+    }, []);
+
     return {
         ...state,
+        recentlyAddedRoms,
         fetchRomsByPlatform,
         refreshRoms,
+        fetchRecentlyAddedRoms,
         clearRoms,
     };
 }
@@ -187,5 +204,38 @@ export function usePlatform(): UsePlatformReturn {
         fetchPlatform,
         refreshPlatform,
         clearPlatform,
+    };
+}
+
+export function useRomsByCollection(collectionId: string, isVirtual: boolean, autoFetch: boolean = true) {
+    const [roms, setRoms] = useState<Rom[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchRoms = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const romsData = await apiClient.getRomsByCollection(collectionId, isVirtual);
+            setRoms(romsData);
+        } catch (err) {
+            console.error('Error fetching collection roms:', err);
+            setError(err instanceof Error ? err.message : 'Unknown error');
+        } finally {
+            setLoading(false);
+        }
+    }, [collectionId]);
+
+    useEffect(() => {
+        if (autoFetch && collectionId) {
+            fetchRoms();
+        }
+    }, [autoFetch, collectionId, fetchRoms]);
+
+    return {
+        roms,
+        loading,
+        error,
+        fetchRoms,
     };
 }

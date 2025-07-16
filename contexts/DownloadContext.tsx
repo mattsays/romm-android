@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { PlatformFolder } from '../hooks/usePlatformFolders';
+import { useRomFileSystem } from '../hooks/useRomFileSystem';
 import { apiClient, Rom } from '../services/api';
 
 // Define the types here to avoid import issues
@@ -65,6 +66,7 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
     const [downloads, setDownloads] = useState<DownloadItem[]>([]);
     const [downloadQueue, setDownloadQueue] = useState<string[]>([]);
     const [activeDownloads, setActiveDownloads] = useState<Set<string>>(new Set());
+    const { refreshRomCheck } = useRomFileSystem();
     const maxConcurrentDownloads = 2;
 
     // Process download queue
@@ -220,6 +222,15 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
                 progress: 100,
                 endTime: new Date(),
             });
+
+            // Update the ROM file system cache to mark the ROM as downloaded
+            try {
+                await refreshRomCheck(download.rom);
+                console.log(`ROM ${download.rom.name} marked as downloaded in filesystem cache`);
+            } catch (error) {
+                console.error('Error updating ROM filesystem cache:', error);
+                // Don't fail the download completion if cache update fails
+            }
 
         } catch (error) {
             console.error('Error completing download:', error);

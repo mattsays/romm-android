@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DownloadStatus, useDownload } from '../contexts/DownloadContext';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface DownloadStatusBarProps {
     onPress?: () => void;
@@ -16,6 +17,7 @@ interface DownloadStatusBarProps {
 export const DownloadStatusBar: React.FC<DownloadStatusBarProps> = ({ onPress }) => {
     const { activeDownloads } = useDownload();
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation();
 
     if (activeDownloads.length === 0) {
         return null;
@@ -56,16 +58,16 @@ export const DownloadStatusBar: React.FC<DownloadStatusBarProps> = ({ onPress })
                                 </Text>
                                 <Text style={styles.secondaryText}>
                                     {currentDownload.progress}% • {formatSpeed(currentDownload.speed)}
-                                    {pendingCount > 0 && ` • +${pendingCount} in coda`}
+                                    {pendingCount > 0 && ` • ${t('pendingInQueue', { count: pendingCount.toString() })}`}
                                 </Text>
                             </>
                         ) : (
                             <>
                                 <Text style={styles.primaryText}>
-                                    {pendingCount} download in coda
+                                    {t('downloadsInQueue', { count: pendingCount.toString() })}
                                 </Text>
                                 <Text style={styles.secondaryText}>
-                                    In attesa di avvio...
+                                    {t('waitingToStart')}
                                 </Text>
                             </>
                         )}

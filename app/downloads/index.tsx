@@ -11,8 +11,10 @@ import {
     View
 } from 'react-native';
 import { DownloadItem, DownloadStatus, useDownload } from '../../contexts/DownloadContext';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export default function DownloadsScreen() {
+    const { t } = useTranslation();
     const {
         downloads,
         activeDownloads,
@@ -79,19 +81,19 @@ export default function DownloadsScreen() {
     const getStatusText = (status: DownloadStatus): string => {
         switch (status) {
             case DownloadStatus.DOWNLOADING:
-                return 'In download';
+                return t('downloading');
             case DownloadStatus.COMPLETED:
-                return 'Completato';
+                return t('completed');
             case DownloadStatus.FAILED:
-                return 'Fallito';
+                return t('failed');
             case DownloadStatus.CANCELLED:
-                return 'Annullato';
+                return t('cancelled');
             case DownloadStatus.PAUSED:
-                return 'In pausa';
+                return t('paused');
             case DownloadStatus.PENDING:
-                return 'In coda';
+                return t('pending');
             default:
-                return 'Sconosciuto';
+                return t('unknown');
         }
     };
 
@@ -221,7 +223,7 @@ export default function DownloadsScreen() {
                 >
                     <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
-                <Text style={styles.title}>Download</Text>
+                <Text style={styles.title}>{t('downloads')}</Text>
                 <View style={styles.headerSpacer} />
             </View>
 
@@ -229,15 +231,15 @@ export default function DownloadsScreen() {
             <View style={styles.summary}>
                 <View style={styles.summaryItem}>
                     <Text style={styles.summaryNumber}>{activeDownloads.length}</Text>
-                    <Text style={styles.summaryLabel}>Attivi</Text>
+                    <Text style={styles.summaryLabel}>{t('active')}</Text>
                 </View>
                 <View style={styles.summaryItem}>
                     <Text style={styles.summaryNumber}>{completedDownloads.length}</Text>
-                    <Text style={styles.summaryLabel}>Completati</Text>
+                    <Text style={styles.summaryLabel}>{t('completed')}</Text>
                 </View>
                 <View style={styles.summaryItem}>
                     <Text style={styles.summaryNumber}>{failedDownloads.length}</Text>
-                    <Text style={styles.summaryLabel}>Falliti</Text>
+                    <Text style={styles.summaryLabel}>{t('failed')}</Text>
                 </View>
             </View>
 
@@ -249,7 +251,7 @@ export default function DownloadsScreen() {
                             style={[styles.clearButton, styles.clearCompletedButton]}
                             onPress={clearCompleted}
                         >
-                            <Text style={styles.clearButtonText}>Cancella completati</Text>
+                            <Text style={styles.clearButtonText}>{t('clearCompleted')}</Text>
                         </TouchableOpacity>
                     )}
                     {failedDownloads.length > 0 && (
@@ -257,7 +259,7 @@ export default function DownloadsScreen() {
                             style={[styles.clearButton, styles.clearFailedButton]}
                             onPress={clearFailed}
                         >
-                            <Text style={styles.clearButtonText}>Cancella falliti</Text>
+                            <Text style={styles.clearButtonText}>{t('clearFailed')}</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -275,8 +277,8 @@ export default function DownloadsScreen() {
                 />
             ) : (
                 <EmptyState
-                    title="Nessun download"
-                    subtitle="I tuoi download appariranno qui"
+                    title={t('noDownloads')}
+                    subtitle={t('noDownloadsDescription')}
                 />
             )}
         </SafeAreaView>
