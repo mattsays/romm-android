@@ -22,9 +22,8 @@ import { useRomFileSystem } from '../../hooks/useRomFileSystem';
 import { usePlatform, useRoms } from '../../hooks/useRoms';
 import { useStorageAccessFramework } from '../../hooks/useStorageAccessFramework';
 import { useTranslation } from '../../hooks/useTranslation';
+import { useDynamicColumns } from '../../hooks/useDynamicColumns';
 import { Rom } from '../../services/api';
-
-const { width } = Dimensions.get('window');
 
 export default function PlatformScreen() {
     const { platform } = useLocalSearchParams();
@@ -40,6 +39,9 @@ export default function PlatformScreen() {
     const [isDownloadingAll, setIsDownloadingAll] = useState(false);
     const [folderSelectionShown, setFolderSelectionShown] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    
+    // Dynamic columns based on screen orientation and device size
+    const { columns, cardWidth, isLandscape } = useDynamicColumns();
 
     const platformId = Number(platform);
 
@@ -274,19 +276,21 @@ export default function PlatformScreen() {
     };
 
     const GameCard = ({ rom }: { rom: Rom & { isEmpty?: boolean } }) => {
-
         if (rom.isEmpty) {
-            return <View style={styles.gameCard} />;
+            return <View style={[styles.gameCard, { width: cardWidth }]} />;
         }
 
         const hasImage = rom.url_cover && rom.url_cover.trim() !== '';
+        
+        // Calculate card height based on width to maintain aspect ratio
+        const cardHeight = Math.floor(cardWidth * 1.4); // 1.4 aspect ratio
 
         return (
             <Pressable
-                style={[styles.gameCard]}
+                style={[styles.gameCard, { width: cardWidth }]}
                 onPress={() => router.push(`/game/${rom.id}`)}
             >
-                <View style={styles.gameImageContainer}>
+                <View style={[styles.gameImageContainer, { height: cardHeight }]}>
                     {hasImage ? (
                         <Image
                             source={{ uri: rom.url_cover }}
@@ -294,25 +298,25 @@ export default function PlatformScreen() {
                         />
                     ) : (
                         <View style={styles.placeholderContainer}>
-                            <Ionicons name="help-outline" size={64} color="#666" />
-                            <Text style={styles.gameTitle} numberOfLines={2}>
+                            <Ionicons name="help-outline" size={Math.min(64, cardWidth * 0.4)} color="#666" />
+                            <Text style={[styles.gameTitle, { fontSize: Math.min(14, cardWidth * 0.1) }]} numberOfLines={2}>
                                 {rom.name || rom.fs_name}
                             </Text>
                         </View>
                     )}
                     {isRomDownloaded(rom.id) && (
                         <View style={styles.completedBadge}>
-                            <Ionicons name="checkmark-circle" size={24} color="#34C759" />
+                            <Ionicons name="checkmark-circle" size={Math.min(24, cardWidth * 0.16)} color="#34C759" />
                         </View>
                     )}
                     {isCheckingRom(rom.id) && (
                         <View style={styles.checkingBadge}>
-                            <ActivityIndicator size={16} color="#FF9500" />
+                            <ActivityIndicator size={Math.min(16, cardWidth * 0.11)} color="#FF9500" />
                         </View>
                     )}
                     {isDownloading(rom.id) && (
                         <View style={styles.downloadingBadge}>
-                            <Ionicons name="download" size={20} color="#FFFFFF" />
+                            <Ionicons name="download" size={Math.min(20, cardWidth * 0.13)} color="#FFFFFF" />
                         </View>
                     )}
 
@@ -320,15 +324,17 @@ export default function PlatformScreen() {
                     {!isRomDownloaded(rom.id) && !isDownloading(rom.id) && (
                         <View style={styles.romOverlay}>
                             <TouchableOpacity
-                                style={styles.downloadButton}
+                                style={[styles.downloadButton, { 
+                                    width: Math.min(32, cardWidth * 0.21), 
+                                    height: Math.min(32, cardWidth * 0.21) 
+                                }]}
                                 onPress={() => handleDownload(rom)}
                             >
-                                <Ionicons name="download-outline" size={16} color="#fff" />
+                                <Ionicons name="download-outline" size={Math.min(16, cardWidth * 0.11)} color="#fff" />
                             </TouchableOpacity>
                         </View>
                     )}
                 </View>
-
             </Pressable>
         );
     };
@@ -354,13 +360,12 @@ export default function PlatformScreen() {
     const availableToDownload = roms.filter(rom => !isDownloading(rom.id) && !isRomDownloaded(rom.id)).length;
 
     // Prepare data for FlatList with empty items to fill last row
-    const ITEMS_PER_ROW = 5;
     const prepareGridData = (data: Rom[]) => {
         const totalItems = data.length;
-        const remainder = totalItems % ITEMS_PER_ROW;
+        const remainder = totalItems % columns;
         if (remainder === 0) return data;
 
-        const emptyItems = ITEMS_PER_ROW - remainder;
+        const emptyItems = columns - remainder;
         const paddedData = [...data];
         for (let i = 0; i < emptyItems; i++) {
             paddedData.push({ id: `empty-${i}`, isEmpty: true } as any);
@@ -414,8 +419,9 @@ export default function PlatformScreen() {
                 data={prepareGridData(roms)}
                 renderItem={({ item }) => <GameCard rom={item} />}
                 keyExtractor={(item) => item.id.toString()}
-                numColumns={5}
-                columnWrapperStyle={styles.row}
+                numColumns={columns}
+                key={`${columns}-${isLandscape}`} // Force re-render when columns or orientation change
+                columnWrapperStyle={columns > 1 ? styles.row : undefined}
                 contentContainerStyle={styles.gamesContainer}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
@@ -614,22 +620,14 @@ const styles = StyleSheet.create({
     row: {
         justifyContent: 'space-between',
         paddingHorizontal: 0,
-    },
-    gamesGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'flex-start',
-        paddingBottom: 20,
-        gap: 10,
+        marginBottom: 15,
     },
     gameCard: {
-        width: 150, // Adjusted for FlatList padding
-        marginBottom: 30,
+        marginBottom: 15,
     },
     gameImageContainer: {
         position: 'relative',
         width: '100%',
-        height: 200,
     },
     gameImage: {
         width: '100%',
@@ -735,8 +733,6 @@ const styles = StyleSheet.create({
     downloadButton: {
         backgroundColor: 'rgba(0, 0, 0, 0.7)',
         borderRadius: 16,
-        width: 32,
-        height: 32,
         justifyContent: 'center',
         alignItems: 'center',
     },
