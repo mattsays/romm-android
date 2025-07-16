@@ -133,7 +133,7 @@ jobs:
             --profile $PROFILE \
             --local \
             --non-interactive \
-            --output "${{ github.workspace }}/app-release.apk"
+            --clear-cache
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
@@ -141,8 +141,22 @@ jobs:
         id: locate-apk
         run: |
           
+          echo "🔍 Searching for APK files..."
+          
+          # Search in common locations
+          APK_FILES=$(find . -name "*.apk" -type f 2>/dev/null || true)
+          
+          if [ -z "$APK_FILES" ]; then
+            echo "❌ No APK files found"
+            echo "📂 Directory structure:"
+            find . -type d -name "*build*" -o -name "*output*" -o -name "*dist*" | head -20
+            echo "📂 Current directory contents:"
+            ls -la
+            exit 1
+          fi
+          
           # Get the first APK file
-          APK_PATH=${{ github.workspace }}/app-release.apk
+          APK_PATH=$(echo "$APK_FILES" | head -1)
           
           # Create descriptive filename
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
