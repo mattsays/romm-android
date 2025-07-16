@@ -1,0 +1,97 @@
+name: Build and Release Android APK
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: # Allows manual trigger
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      - name: 🏗 Setup Workflow
+        uses: ./.github/actions/setup
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.x'
+          cache: pnpm
+      - name: 📦 Install dependencies
+        run: pnpm install
+     
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 🚀 Build Android APK
+        run: |
+          # Build for Android using EAS local build
+          eas build --platform android --profile production --local --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 📁 Find APK file
+        id: find-apk
+        run: |
+          # Find the generated APK file
+          APK_PATH=$(find . -name "*.apk" -type f | head -1)
+          echo "apk-path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "Found APK at: $APK_PATH"
+
+      - name: 📤 Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: romm-android-${{ github.ref_name }}.apk
+          path: ${{ steps.find-apk.outputs.apk-path }}
+          retention-days: 30
+
+      - name: 📤 Upload APK to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ steps.find-apk.outputs.apk-path }}
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📝 Add build info to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          append_body: true
+          body: |
+            
+            ## 📱 Download
+            - **Android APK**: Download the `.apk` file from the assets below
+            
+            ## 🔧 Build Information
+            - Built with EAS Build (Local)
+            - Platform: Android
+            - Profile: Production
+            - Node.js: 18.x
+            - Java: 17
+            
+            ## 📋 Installation Instructions
+            1. Download the APK file
+            2. Enable "Install from unknown sources" in your Android settings
+            3. Install the downloaded APK
+            4. Launch RomM Android and configure your server connection
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
