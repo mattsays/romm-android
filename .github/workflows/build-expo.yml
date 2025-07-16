@@ -1,0 +1,141 @@
+name: 🚀 Build APK
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      build_profile:
+        description: 'Build Profile'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+
+jobs:
+  build:
+    name: 📱 EAS Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🤖 Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏗️ Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 🚀 Build APK
+        run: |
+          # Determine build profile
+          if [ "${{ github.event_name }}" = "release" ]; then
+            PROFILE="production"
+            echo "🎯 Building PRODUCTION build for release"
+          else
+            PROFILE="${{ inputs.build_profile || 'preview' }}"
+            echo "🎯 Building $PROFILE build (manual trigger)"
+          fi
+          
+          echo "📋 Build info:"
+          echo "  Profile: $PROFILE"
+          echo "  Platform: Android"
+          echo "  Method: EAS Local Build"
+          
+          # Run the build
+          eas build \
+            --platform android \
+            --profile $PROFILE \
+            --local \
+            --non-interactive \
+            --clear-cache
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 🔍 Locate APK
+        id: locate-apk
+        run: |
+          echo "🔍 Searching for APK files..."
+          
+          # Search in common locations
+          APK_FILES=$(find . -name "*.apk" -type f 2>/dev/null || true)
+          
+          if [ -z "$APK_FILES" ]; then
+            echo "❌ No APK files found"
+            echo "📂 Directory structure:"
+            find . -type d -name "*build*" -o -name "*output*" -o -name "*dist*" | head -20
+            echo "📂 Current directory contents:"
+            ls -la
+            exit 1
+          fi
+          
+          # Get the first APK file
+          APK_PATH=$(echo "$APK_FILES" | head -1)
+          
+          # Create descriptive filename
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          if [ "${{ github.event_name }}" = "release" ]; then
+            NEW_NAME="romm-android-${{ github.ref_name }}.apk"
+          else
+            NEW_NAME="romm-android-dev-${TIMESTAMP}.apk"
+          fi
+          
+          # Move and rename
+          mv "$APK_PATH" "$NEW_NAME"
+          
+          # Output for next steps
+          echo "apk_path=$NEW_NAME" >> $GITHUB_OUTPUT
+          echo "apk_name=$NEW_NAME" >> $GITHUB_OUTPUT
+          
+          # Show file info
+          echo "✅ APK ready: $NEW_NAME"
+          ls -lh "$NEW_NAME"
+
+      - name: 📤 Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.locate-apk.outputs.apk_name }}
+          path: ${{ steps.locate-apk.outputs.apk_path }}
+          retention-days: 30
+
+      - name: 🏷️ Attach APK to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.locate-apk.outputs.apk_path }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ✅ Build complete
+        run: |
+          echo "🎉 Build completed successfully!"
+          echo "📱 APK: ${{ steps.locate-apk.outputs.apk_name }}"
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "🚀 APK attached to release: ${{ github.ref_name }}"
+          else
+            echo "📦 APK available in workflow artifacts"
+          fi
