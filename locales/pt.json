@@ -101,6 +101,7 @@
     "clearFailed": "Limpar Falhados",
     "confirmDownload": "Confirmar Download",
     "downloadAllRomsQuestion": "Deseja baixar {{count}} ROMs para {{platform}}?",
+    "downloadAllRomsQuestionCollection": "Deseja baixar todas as ROMs na coleção \"{{collection}}\"?",
     "downloadAllStarted": "Download Geral Iniciado",
     "romsAddedToQueue": "{{count}} ROMs foram adicionadas à fila de download.",
     "errorAddingToQueue": "Erro ao adicionar ROMs à fila de download.",

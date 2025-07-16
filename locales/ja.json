@@ -101,6 +101,7 @@
     "clearFailed": "失敗をクリア",
     "confirmDownload": "ダウンロードの確認",
     "downloadAllRomsQuestion": "{{platform}}の{{count}}個のROMをダウンロードしますか？",
+    "downloadAllRomsQuestionCollection": "コレクション「{{collection}}」のすべてのROMをダウンロードしますか？",
     "downloadAllStarted": "一括ダウンロード開始",
     "romsAddedToQueue": "{{count}}個のROMがダウンロードキューに追加されました。",
     "errorAddingToQueue": "ROMをダウンロードキューに追加する際にエラーが発生しました。",

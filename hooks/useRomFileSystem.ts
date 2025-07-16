@@ -14,26 +14,10 @@ export const useRomFileSystem = () => {
     const [fileChecks, setFileChecks] = useState<Record<number, boolean>>({});
     const [checking, setChecking] = useState<Record<number, boolean>>({});
 
-    const calculateFileMD5 = useCallback(async (fileUri: string): Promise<string | null> => {
-        try {
-            const fileStat = await FileSystem.getInfoAsync(fileUri, { md5: true });
-
-            if (!fileStat.exists || !fileStat.md5) {
-                console.warn(`File not found or MD5 not available for: ${fileUri}`);
-                return null;
-            }
-
-            return fileStat.md5;
-        } catch (error) {
-            console.error('Error calculating MD5:', error);
-            throw error;
-        }
-    }, []);
-
     const checkIfRomExists = useCallback(async (rom: Rom): Promise<boolean> => {
-        // Check if there are files and if the first file has an MD5 hash
-        if (!rom.files || rom.files.length === 0 || !rom.files[0].md5_hash) {
-            console.log('No MD5 hash available for this ROM');
+        // Check if there are files
+        if (!rom.files || rom.files.length === 0) {
+            console.log('No files available for this ROM');
             return false;
         }
 
@@ -52,29 +36,19 @@ export const useRomFileSystem = () => {
                 platformFolder.folderUri
             );
 
-            const expectedMD5 = rom.files[0].md5_hash;
-
-            // Check each file to see if it matches our MD5 hash
+            // Check each file to see if it matches file name
             for (const fileUri of files) {
                 try {
                     // Check if the file name matches what we're looking for
                     const decodedUri = decodeURIComponent(fileUri);
                     const fileName = decodedUri.split('/').pop() || '';
 
-                    // If the file name matches, calculate the MD5
+                    // If the file name matches set the fileChecks state
                     if (fileName === rom.fs_name || fileName.includes(rom.fs_name.split('.')[0])) {
-                        console.log(`Checking MD5 of file: ${fileName}`);
-
-                        const fileMD5 = await calculateFileMD5(fileUri);
-                        console.log(`Calculated MD5: ${fileMD5}`);
-                        console.log(`Expected MD5: ${expectedMD5}`);
-
-                        if (fileMD5 === expectedMD5) {
-                            console.log('Already downloaded file found!');
-                            const exists = true;
-                            setFileChecks(prev => ({ ...prev, [rom.id]: exists }));
-                            return exists;
-                        }
+                        console.log('Already downloaded file found!');
+                        const exists = true;
+                        setFileChecks(prev => ({ ...prev, [rom.id]: exists }));
+                        return exists;
                     }
                 } catch (fileError) {
                     console.warn(`Error checking file ${fileUri}:`, fileError);
@@ -95,7 +69,7 @@ export const useRomFileSystem = () => {
         } finally {
             setChecking(prev => ({ ...prev, [rom.id]: false }));
         }
-    }, [getPlatformFolder, calculateFileMD5]);
+    }, [getPlatformFolder]);
 
     const isRomDownloaded = useCallback((romId: number): boolean => {
         // console.log('Controllo se ROM è scaricata:', romId);

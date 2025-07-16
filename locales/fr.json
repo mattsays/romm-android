@@ -101,6 +101,7 @@
     "clearFailed": "Effacer échoués",
     "confirmDownload": "Confirmer téléchargement",
     "downloadAllRomsQuestion": "Voulez-vous télécharger {{count}} ROMs pour {{platform}} ?",
+    "downloadAllRomsQuestionCollection": "Voulez-vous télécharger toutes les ROMs dans la collection \"{{collection}}\" ?",
     "downloadAllStarted": "Téléchargement de toutes les ROMs commencé",
     "romsAddedToQueue": "{{count}} ROMs ont été ajoutées à la file de téléchargement.",
     "errorAddingToQueue": "Erreur lors de l'ajout des ROMs à la file de téléchargement.",

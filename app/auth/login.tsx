@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     KeyboardAvoidingView,
-    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -91,7 +90,7 @@ export default function LoginScreen() {
         try {
             clearError();
             await login(credentials);
-            
+
             // Save the server URL after successful login
             if (serverUrl.trim()) {
                 try {
@@ -100,7 +99,7 @@ export default function LoginScreen() {
                     console.error('Failed to save URL after login:', error);
                 }
             }
-            
+
             router.replace('/');
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : t('errorDuringLogin');

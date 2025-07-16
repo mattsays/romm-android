@@ -101,6 +101,7 @@
     "clearFailed": "Clear Failed",
     "confirmDownload": "Confirm Download",
     "downloadAllRomsQuestion": "Do you want to download {{count}} ROMs for {{platform}}?",
+    "downloadAllRomsQuestionCollection": "Do you want to download all ROMs in the collection \"{{collection}}\"?",
     "downloadAllStarted": "Download All Started",
     "romsAddedToQueue": "{{count}} ROMs have been added to the download queue.",
     "errorAddingToQueue": "Error adding ROMs to download queue.",

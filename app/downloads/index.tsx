@@ -268,7 +268,29 @@ export default function DownloadsScreen() {
             {/* Downloads list */}
             {downloads.length > 0 ? (
                 <FlatList
-                    data={downloads}
+                    data={downloads.sort((a, b) => {
+                        // Priority order: DOWNLOADING > PENDING > PAUSED > FAILED/CANCELLED > COMPLETED
+                        const statusPriority = {
+                            [DownloadStatus.DOWNLOADING]: 1,
+                            [DownloadStatus.PENDING]: 2,
+                            [DownloadStatus.PAUSED]: 3,
+                            [DownloadStatus.FAILED]: 4,
+                            [DownloadStatus.CANCELLED]: 4,
+                            [DownloadStatus.COMPLETED]: 5,
+                        };
+
+                        const priorityA = statusPriority[a.status] || 6;
+                        const priorityB = statusPriority[b.status] || 6;
+
+                        // If same priority, sort by start time (newer first)
+                        if (priorityA === priorityB) {
+                            const timeA = a.startTime?.getTime() || 0;
+                            const timeB = b.startTime?.getTime() || 0;
+                            return timeB - timeA;
+                        }
+
+                        return priorityA - priorityB;
+                    })}
                     keyExtractor={(item) => item.id}
                     renderItem={renderDownloadItem}
                     style={styles.downloadsList}

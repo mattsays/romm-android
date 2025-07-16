@@ -101,6 +101,7 @@
     "clearFailed": "Cancella Falliti",
     "confirmDownload": "Conferma Download",
     "downloadAllRomsQuestion": "Vuoi scaricare {{count}} ROM per {{platform}}?",
+    "downloadAllRomsQuestionCollection": "Vuoi scaricare tutte le ROM nella collezione \"{{collection}}\"?",
     "downloadAllStarted": "Download di Tutte le ROM Iniziato",
     "romsAddedToQueue": "{{count}} ROM sono state aggiunte alla coda di download.",
     "errorAddingToQueue": "Errore durante l'aggiunta delle ROM alla coda di download.",

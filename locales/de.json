@@ -101,6 +101,7 @@
     "clearFailed": "Fehlgeschlagene löschen",
     "confirmDownload": "Download bestätigen",
     "downloadAllRomsQuestion": "Möchten Sie {{count}} ROMs für {{platform}} herunterladen?",
+    "downloadAllRomsQuestionCollection": "Möchten Sie alle ROMs in der Sammlung \"{{collection}}\" herunterladen?",
     "downloadAllStarted": "Download aller ROMs gestartet",
     "romsAddedToQueue": "{{count}} ROMs wurden zur Download-Warteschlange hinzugefügt.",
     "errorAddingToQueue": "Fehler beim Hinzufügen von ROMs zur Download-Warteschlange.",

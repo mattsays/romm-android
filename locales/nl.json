@@ -101,6 +101,7 @@
     "clearFailed": "Mislukte wissen",
     "confirmDownload": "Download bevestigen",
     "downloadAllRomsQuestion": "Wil je {{count}} ROMs voor {{platform}} downloaden?",
+    "downloadAllRomsQuestionCollection": "Wil je alle ROMs in de collectie \"{{collection}}\" downloaden?",
     "downloadAllStarted": "Bulk download gestart",
     "romsAddedToQueue": "{{count}} ROMs zijn toegevoegd aan de downloadwachtrij.",
     "errorAddingToQueue": "Fout bij toevoegen ROMs aan downloadwachtrij.",

@@ -1,9 +1,11 @@
+import { DownloadStatusBar } from '@/components/DownloadStatusBar';
 import { useRomDownload } from '@/hooks/useRomDownload';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Dimensions,
     FlatList,
     Image,
@@ -36,11 +38,12 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
     const { roms, loading, error, fetchRoms } = useRomsByCollection(collectionId, isVirtual);
     const [collection, setCollection] = useState<ApiCollection | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [isDownloadingAll, setIsDownloadingAll] = useState(false);
     const { activeDownloads, addToQueue, isDownloading, completedDownloads } = useDownload();
     const { downloadRom } = useRomDownload();
-    const { showErrorToast, showInfoToast } = useToast();
-    const { platformFolders } = usePlatformFolders();
-    const { checkMultipleRoms, isRomDownloaded, isCheckingRom } = useRomFileSystem();
+    const { showErrorToast, showInfoToast, showSuccessToast } = useToast();
+    const { platformFolders, getPlatformFolder } = usePlatformFolders();
+    const { checkMultipleRoms, isRomDownloaded, isCheckingRom, refreshRomCheck } = useRomFileSystem();
     const insets = useSafeAreaInsets();
 
     // Debug platform folders
@@ -74,51 +77,51 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
 
     // Check filesystem for existing ROMs when ROMs are loaded
     useEffect(() => {
-        const checkCollectionRomFolders = async () => {
-            if (roms && roms.length > 0) {
-                for (const rom of roms) {
-                    const platformFolder = platformFolders.find(
-                        folder => folder.platformSlug === rom.platform_slug
-                    );
-                    if (platformFolder) {
-                        checkMultipleRoms([rom], platformFolder.folderUri);
-                    }
-                }
-            }
-        };
         checkCollectionRomFolders();
     }, [roms, platformFolders, checkMultipleRoms]);
 
     // Monitor completed downloads to refresh ROM status in collection view
     useEffect(() => {
         if (completedDownloads.length > 0 && roms && roms.length > 0) {
-            const checkCollectionRomFoldersAfterDownload = async () => {
-                for (const rom of roms) {
-                    const platformFolder = platformFolders.find(
-                        folder => folder.platformSlug === rom.platform_slug
-                    );
-                    if (platformFolder) {
-                        checkMultipleRoms([rom], platformFolder.folderUri);
-                    }
-                }
-            };
-            checkCollectionRomFoldersAfterDownload();
+            console.log('Completed downloads detected in collection, rechecking ROM folders');
+            checkCollectionRomFolders();
         }
-    }, [completedDownloads.length, roms, platformFolders, checkMultipleRoms]);
+    }, [completedDownloads.length, roms?.length]);
+
+    const checkCollectionRomFolders = async () => {
+        if (roms && roms.length > 0) {
+            console.log(`Checking ${roms.length} ROMs in collection ${collection?.name}`);
+            for (const rom of roms) {
+                const platformFolder = platformFolders.find(
+                    folder => folder.platformSlug === rom.platform_slug
+                );
+                if (platformFolder) {
+                    console.log(`Checking ROM ${rom.fs_name} in platform ${rom.platform_name}`);
+                    await checkMultipleRoms([rom], platformFolder.folderUri);
+                } else {
+                    console.log(`No platform folder found for ${rom.platform_name} (${rom.platform_slug})`);
+                }
+            }
+            console.log('Collection ROM check completed');
+        }
+    };
 
     const onRefresh = async () => {
         setRefreshing(true);
         try {
             await fetchRoms();
-            for (const rom of roms) {
-                const platformFolder = platformFolders.find(
-                    folder => folder.platformSlug === rom.platform_slug
-                );
-                console.log(`Checking ROM ${rom.fs_name} in folder:`, platformFolder?.folderUri);
-                if (platformFolder) {
-                    await checkMultipleRoms([rom], platformFolder.folderUri);
+            console.log('Collection data refreshed, forcing complete ROM check');
+
+            // Force a complete refresh of ROM checks for all ROMs
+            setTimeout(async () => {
+                if (roms && roms.length > 0) {
+                    console.log('Force refreshing all ROM checks in collection');
+                    for (const rom of roms) {
+                        await refreshRomCheck(rom);
+                    }
+                    console.log('All collection ROM checks refreshed');
                 }
-            }
+            }, 500); // Small delay to ensure data is updated
         } catch (error) {
             console.error('Error during refresh:', error);
         } finally {
@@ -145,6 +148,76 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
                 );
             }
         }
+    };
+
+    const handleDownloadAll = async () => {
+        if (!collection || roms.length === 0) {
+            showErrorToast(t('noRomsAvailable'), t('error'));
+            return;
+        }
+
+        // Get all unique platforms from the collection's ROMs
+        const uniquePlatforms = [...new Set(roms.map(rom => rom.platform_slug))];
+
+        // Check if all platforms have configured folders
+        const missingFolders: string[] = [];
+        for (const platformSlug of uniquePlatforms) {
+            const platformFolder = await getPlatformFolder(platformSlug);
+            if (!platformFolder) {
+                const platform = roms.find(rom => rom.platform_slug === platformSlug);
+                missingFolders.push(platform?.platform_name || platformSlug);
+            }
+        }
+
+        if (missingFolders.length > 0) {
+            Alert.alert(
+                t('error'),
+                t('selectFolderFirst', { platform: missingFolders.join(', ') }),
+                [{ text: t('ok'), style: 'default' }]
+            );
+            return;
+        }
+
+        // Filter out ROMs that are already being downloaded or already exist on filesystem
+        const romsToDownload = roms.filter(rom => !isDownloading(rom.id) && !isRomDownloaded(rom.id));
+
+        if (romsToDownload.length === 0) {
+            showInfoToast(t('allRomsDownloaded'), t('info'));
+            return;
+        }
+
+        Alert.alert(
+            t('confirmDownload'),
+            t('downloadAllRomsQuestionCollection', { count: romsToDownload.length.toString(), collection: collection.name }),
+            [
+                { text: t('cancel'), style: 'cancel' },
+                {
+                    text: t('downloadAll'),
+                    onPress: async () => {
+                        setIsDownloadingAll(true);
+                        try {
+                            // Add all ROMs to download queue with their respective platform folders
+                            for (const rom of romsToDownload) {
+                                const platformFolder = await getPlatformFolder(rom.platform_slug);
+                                if (platformFolder) {
+                                    addToQueue(rom, platformFolder);
+                                }
+                            }
+
+                            showSuccessToast(
+                                t('romsAddedToQueue', { count: romsToDownload.length.toString() }),
+                                t('downloadAllStarted')
+                            );
+                        } catch (error) {
+                            console.error('Error adding ROMs to queue:', error);
+                            showErrorToast(t('errorAddingToQueue'), t('error'));
+                        } finally {
+                            setIsDownloadingAll(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const RomCard = ({ rom }: { rom: Rom & { isEmpty?: boolean } }) => {
@@ -231,6 +304,9 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
         return paddedData;
     };
 
+    // Calculate available ROMs to download
+    const availableToDownload = roms.filter(rom => !isDownloading(rom.id) && !isRomDownloaded(rom.id)).length;
+
     return (
         <ProtectedRoute>
             <View style={styles.container}>
@@ -250,6 +326,27 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
                             <Text style={styles.headerSubtitle}>
                                 {roms.length} {t('games')}
                             </Text>
+                        </View>
+                        <View style={styles.headerButtons}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.downloadAllButton,
+                                    availableToDownload === 0 && styles.downloadAllButtonDisabled
+                                ]}
+                                onPress={handleDownloadAll}
+                                disabled={isDownloadingAll || availableToDownload === 0}
+                            >
+                                {isDownloadingAll ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="download" size={20} color="#fff" />
+                                        {availableToDownload > 0 && (
+                                            <Text style={styles.downloadAllText}>{availableToDownload}</Text>
+                                        )}
+                                    </>
+                                )}
+                            </TouchableOpacity>
                         </View>
                     </View>
                     {collection?.description && (
@@ -288,6 +385,8 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
                     }
                     contentInsetAdjustmentBehavior="automatic"
                 />
+
+                <DownloadStatusBar onPress={() => router.push('/downloads')} />
             </View>
         </ProtectedRoute>
     );
@@ -324,6 +423,11 @@ const styles = StyleSheet.create({
     },
     headerInfo: {
         flex: 1,
+    },
+    headerButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
     },
     headerTitle: {
         color: '#fff',
@@ -457,5 +561,27 @@ const styles = StyleSheet.create({
         fontSize: 16,
         textAlign: 'center',
         marginTop: 16,
+    },
+    downloadAllButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        padding: 10,
+        borderRadius: 8,
+        backgroundColor: '#007AFF',
+        minWidth: 44,
+        minHeight: 44,
+        justifyContent: 'center',
+    },
+    downloadAllButtonDisabled: {
+        backgroundColor: '#555',
+        opacity: 0.6,
+    },
+    downloadAllText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 'bold',
+        minWidth: 16,
+        textAlign: 'center',
     },
 });

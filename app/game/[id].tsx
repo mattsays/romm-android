@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -17,6 +17,7 @@ import { useDownload } from '../../contexts/DownloadContext';
 import { useToast } from '../../contexts/ToastContext';
 import { usePlatformFolders } from '../../hooks/usePlatformFolders';
 import { useRomDownload } from '../../hooks/useRomDownload';
+import { useRomFileSystem } from '../../hooks/useRomFileSystem';
 import { useTranslation } from '../../hooks/useTranslation';
 import { apiClient, Rom } from '../../services/api';
 
@@ -28,27 +29,66 @@ export default function GameDetailsScreen() {
     const [rom, setRom] = useState<Rom | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isAlreadyDownloaded, setIsAlreadyDownloaded] = useState(false);
-    const [checkingExistingFile, setCheckingExistingFile] = useState(false);
     const [existingFilePath, setExistingFilePath] = useState<string | null>(null);
     const { downloadRom, isRomDownloading } = useRomDownload();
-    const { getDownloadById } = useDownload();
-    const {
-        getPlatformFolder
-    } = usePlatformFolders();
+    const { getDownloadById, completedDownloads, activeDownloads } = useDownload();
+    const { getPlatformFolder } = usePlatformFolders();
+    const { checkIfRomExists, isRomDownloaded, isCheckingRom, refreshRomCheck } = useRomFileSystem();
+
+    // Ref per tenere traccia dei download completati già processati
+    const processedDownloadsRef = useRef<Set<string>>(new Set());
+
+    // Get the current download item for the ROM to access progress
+    const getCurrentDownload = () => {
+        if (!rom) return null;
+        return activeDownloads.find(download => download.rom.id === rom.id) || null;
+    };
+
+    const currentDownload = getCurrentDownload();
+    const downloadProgress = (currentDownload?.progress || 0) / 100; // Progress is 0-100, convert to 0-1 for width percentage
 
     useEffect(() => {
         if (id) {
+            // Reset dei download processati quando cambia la ROM
+            processedDownloadsRef.current.clear();
             loadRomDetails();
         }
     }, [id]);
 
-    // Check if the file is already downloaded when the ROM is loaded
+    // Listen for completed downloads to refresh ROM check
+    useEffect(() => {
+        if (rom && completedDownloads.length > 0) {
+            // Controlla solo i nuovi download completati che non sono stati processati
+            const newCompletedDownloads = completedDownloads.filter(
+                download => download.rom.id === rom.id && !processedDownloadsRef.current.has(download.id)
+            );
+
+            if (newCompletedDownloads.length > 0) {
+                // Marca tutti i nuovi download come processati
+                newCompletedDownloads.forEach(download => {
+                    processedDownloadsRef.current.add(download.id);
+                });
+
+                // Aggiorna lo stato per questa ROM
+                const refreshAndUpdate = async () => {
+                    await refreshRomCheck(rom);
+                    await updateExistingFilePath(rom);
+                };
+                refreshAndUpdate();
+            }
+        }
+    }, [completedDownloads, rom?.id]);
+
+    // Force check ROM status when ROM changes
     useEffect(() => {
         if (rom) {
-            checkIfFileAlreadyExists(rom);
+            const checkRomStatus = async () => {
+                await updateExistingFilePath(rom);
+                await refreshRomCheck(rom);
+            };
+            checkRomStatus();
         }
-    }, [rom]); // Also recheck when platform folders change
+    }, [rom?.id]);
 
     const loadRomDetails = async () => {
         try {
@@ -56,11 +96,59 @@ export default function GameDetailsScreen() {
             setError(null);
             const romData = await apiClient.getRomById(parseInt(id));
             setRom(romData);
+            // Update existing file path when ROM is loaded
+            await updateExistingFilePath(romData);
         } catch (error) {
             console.error('Error loading ROM details:', error);
             setError(t('errorLoadingGameDetails'));
         } finally {
             setLoading(false);
+        }
+    };
+
+    const updateExistingFilePath = async (rom: Rom) => {
+        try {
+            console.log('Updating existing file path for ROM:', rom.fs_name);
+            const platformSlug = rom.platform_slug;
+            const platformFolder = await getPlatformFolder(platformSlug);
+
+            if (!platformFolder) {
+                console.log('No platform folder found for:', platformSlug);
+                setExistingFilePath(null);
+                return;
+            }
+
+            console.log('Platform folder found:', platformFolder.folderUri);
+            // Read all files in the platform folder
+            const files = await FileSystem.StorageAccessFramework.readDirectoryAsync(
+                platformFolder.folderUri
+            );
+
+            console.log(`Found ${files.length} files in platform folder`);
+            // Check each file to see if it matches our ROM
+            for (const fileUri of files) {
+                try {
+                    const decodedUri = decodeURIComponent(fileUri);
+                    const fileName = decodedUri.split('/').pop() || '';
+                    console.log('Checking file:', fileName, 'against ROM:', rom.fs_name);
+
+                    // If the file name matches, set the path
+                    if (fileName === rom.fs_name || fileName.includes(rom.fs_name.split('.')[0])) {
+                        console.log('File match found:', decodedUri);
+                        setExistingFilePath(decodedUri);
+                        return;
+                    }
+                } catch (fileError) {
+                    console.warn(`Error checking file ${fileUri}:`, fileError);
+                }
+            }
+
+            console.log('No matching file found for ROM:', rom.fs_name);
+            // If no file found, clear the path
+            setExistingFilePath(null);
+        } catch (error) {
+            console.error('Error updating existing file path:', error);
+            setExistingFilePath(null);
         }
     };
 
@@ -73,7 +161,6 @@ export default function GameDetailsScreen() {
 
         try {
             await downloadRom(rom);
-
         } catch (error: any) {
             console.error('Download error:', error);
 
@@ -108,8 +195,6 @@ export default function GameDetailsScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            setCheckingExistingFile(true);
-
                             // Try to delete the file using Storage Access Framework
                             const platformSlug = rom.platform_slug;
                             const platformFolder = await getPlatformFolder(platformSlug);
@@ -134,8 +219,9 @@ export default function GameDetailsScreen() {
                                 await FileSystem.StorageAccessFramework.deleteAsync(fileToDelete);
 
                                 // Update the state to reflect that the file is no longer downloaded
-                                setIsAlreadyDownloaded(false);
                                 setExistingFilePath(null);
+                                // Refresh the ROM check in the global state
+                                await refreshRomCheck(rom);
 
                                 showSuccessToast(
                                     t('fileDeletedSuccessfully'),
@@ -151,8 +237,6 @@ export default function GameDetailsScreen() {
                                 t('cannotDeleteFile', { error: errorMessage }),
                                 t('error')
                             );
-                        } finally {
-                            setCheckingExistingFile(false);
                         }
                     },
                 },
@@ -160,64 +244,7 @@ export default function GameDetailsScreen() {
         );
     };
 
-    const checkIfFileAlreadyExists = async (rom: Rom): Promise<void> => {
-        // Check if there are files and if the first file has an MD5 hash
-        if (!rom.files || rom.files.length === 0 || !rom.files[0].md5_hash) {
-            console.log('No MD5 hash available for this ROM');
-            setIsAlreadyDownloaded(false);
-            return;
-        }
 
-        const platformSlug = rom.platform_slug;
-        const platformFolder = await getPlatformFolder(platformSlug);
-
-        if (!platformFolder) {
-            setIsAlreadyDownloaded(false);
-            return;
-        }
-
-        try {
-            setCheckingExistingFile(true);
-            console.log('Checking if file already exists...');
-
-            // Read all files in the platform folder
-            const files = await FileSystem.StorageAccessFramework.readDirectoryAsync(
-                platformFolder.folderUri
-            );
-
-            console.log(`Found ${files.length} files in folder ${platformFolder.platformName}`);
-
-            // Check each file to see if it matches our MD5 hash
-            for (const fileUri of files) {
-                try {
-                    // Check if the file name matches what we're looking for
-                    const decodedUri = decodeURIComponent(fileUri);
-                    const fileName = decodedUri.split('/').pop() || '';
-
-                    // If the file name matches, calculate the MD5
-                    if (fileName === rom.fs_name || fileName.includes(rom.fs_name.split('.')[0])) {
-                        setIsAlreadyDownloaded(true);
-                        setExistingFilePath(decodedUri);
-                        return;
-                    }
-                } catch (fileError) {
-                    console.warn(`Error checking file ${fileUri}:`, fileError);
-                    // Continue checking other files even if one fails
-                }
-            }
-
-            console.log('File not found in folder');
-            setIsAlreadyDownloaded(false);
-            setExistingFilePath(null);
-
-        } catch (error) {
-            console.error('Error checking existing files:', error);
-            setIsAlreadyDownloaded(false);
-            setExistingFilePath(null);
-        } finally {
-            setCheckingExistingFile(false);
-        }
-    };
 
     if (loading) {
         return (
@@ -292,69 +319,107 @@ export default function GameDetailsScreen() {
 
                         {/* Download Section */}
                         <View style={styles.section}>
-                            {checkingExistingFile ? (
-                                <View style={styles.checkingContainer}>
-                                    <ActivityIndicator size="small" color="#007AFF" />
-                                    <Text style={styles.checkingText}>{t('checkingExistingFiles')}</Text>
-                                </View>
-                            ) : isAlreadyDownloaded ? (
-                                <View style={styles.alreadyDownloadedContainer}>
-                                    <View style={styles.alreadyDownloadedHeader}>
-                                        <Ionicons name="checkmark-circle" size={24} color="#34C759" />
-                                        <Text style={styles.alreadyDownloadedTitle}>{t('fileAlreadyDownloaded')}</Text>
-                                    </View>
-                                    <Text style={styles.alreadyDownloadedPath}>
-                                        {t('filePath')}: {existingFilePath}
-                                    </Text>
-                                    <View style={styles.alreadyDownloadedActions}>
+                            {(() => {
+                                const isDownloaded = rom && isRomDownloaded(rom.id);
+                                const isChecking = rom && isCheckingRom(rom.id);
+                                const isCurrentlyDownloading = rom && isRomDownloading(rom.id);
+
+                                console.log('ROM Status Check:', {
+                                    romId: rom?.id,
+                                    romName: rom?.fs_name,
+                                    isDownloaded,
+                                    isChecking,
+                                    isCurrentlyDownloading,
+                                    hasExistingPath: !!existingFilePath
+                                });
+
+                                if (isChecking) {
+                                    return (
+                                        <View style={styles.checkingContainer}>
+                                            <ActivityIndicator size="small" color="#007AFF" />
+                                            <Text style={styles.checkingText}>{t('checkingExistingFiles')}</Text>
+                                        </View>
+                                    );
+                                } else if (isDownloaded) {
+                                    return (
+                                        <View style={styles.alreadyDownloadedContainer}>
+                                            <View style={styles.alreadyDownloadedHeader}>
+                                                <Ionicons name="checkmark-circle" size={24} color="#34C759" />
+                                                <Text style={styles.alreadyDownloadedTitle}>{t('fileAlreadyDownloaded')}</Text>
+                                            </View>
+                                            {existingFilePath && (
+                                                <Text style={styles.alreadyDownloadedPath}>
+                                                    {t('filePath')}: {existingFilePath}
+                                                </Text>
+                                            )}
+                                            <View style={styles.alreadyDownloadedActions}>
+                                                <TouchableOpacity
+                                                    style={[styles.downloadButton, styles.redownloadButton]}
+                                                    onPress={handleDownload}
+                                                    disabled={isCurrentlyDownloading}
+                                                >
+                                                    <Ionicons name="download-outline" size={20} color="#fff" />
+                                                    <Text style={styles.downloadButtonText}>{t('redownload')}</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={[styles.downloadButton, styles.verifyButton]}
+                                                    onPress={() => rom && refreshRomCheck(rom).then(() => updateExistingFilePath(rom))}
+                                                >
+                                                    <Ionicons name="refresh-outline" size={20} color="#fff" />
+                                                    <Text style={styles.downloadButtonText}>{t('verify')}</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={[styles.downloadButton, styles.deleteButton]}
+                                                    onPress={() => handleDeleteFile(rom)}
+                                                >
+                                                    <Ionicons name="trash-outline" size={20} color="#fff" />
+                                                    <Text style={styles.downloadButtonText}>{t('delete')}</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    );
+                                } else {
+                                    return (
                                         <TouchableOpacity
-                                            style={[styles.downloadButton, styles.redownloadButton]}
+                                            style={[
+                                                styles.downloadButton,
+                                                isCurrentlyDownloading && styles.downloadingButton
+                                            ]}
                                             onPress={handleDownload}
-                                            disabled={isRomDownloading(rom.id)}
+                                            disabled={isCurrentlyDownloading}
                                         >
-                                            <Ionicons name="download-outline" size={20} color="#fff" />
-                                            <Text style={styles.downloadButtonText}>{t('redownload')}</Text>
+                                            {/* Progress bar background when downloading */}
+                                            {isCurrentlyDownloading && (
+                                                <View style={[styles.progressBackground, StyleSheet.absoluteFill]}>
+                                                    <View
+                                                        style={[
+                                                            styles.progressFill,
+                                                            { width: `${downloadProgress * 100}%` }
+                                                        ]}
+                                                    />
+                                                </View>
+                                            )}
+
+                                            {isCurrentlyDownloading ? (
+                                                <View style={styles.downloadingContent}>
+                                                    <ActivityIndicator size="small" color="#fff" />
+                                                    <Text style={styles.downloadButtonText}>
+                                                        {currentDownload ?
+                                                            `${t('downloading')} ${Math.round(downloadProgress * 100)}%` :
+                                                            t('addedToQueue')
+                                                        }
+                                                    </Text>
+                                                </View>
+                                            ) : (
+                                                <View style={styles.downloadContent}>
+                                                    <Ionicons name="download-outline" size={20} color="#fff" />
+                                                    <Text style={styles.downloadButtonText}>{t('downloadRom')}</Text>
+                                                </View>
+                                            )}
                                         </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={[styles.downloadButton, styles.verifyButton]}
-                                            onPress={() => checkIfFileAlreadyExists(rom)}
-                                        >
-                                            <Ionicons name="refresh-outline" size={20} color="#fff" />
-                                            <Text style={styles.downloadButtonText}>{t('verify')}</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={[styles.downloadButton, styles.deleteButton]}
-                                            onPress={() => handleDeleteFile(rom)}
-                                        >
-                                            <Ionicons name="trash-outline" size={20} color="#fff" />
-                                            <Text style={styles.downloadButtonText}>{t('delete')}</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            ) : (
-                                <TouchableOpacity
-                                    style={[
-                                        styles.downloadButton,
-                                        isRomDownloading(rom.id) && styles.downloadingButton
-                                    ]}
-                                    onPress={handleDownload}
-                                    disabled={isRomDownloading(rom.id)}
-                                >
-                                    {isRomDownloading(rom.id) ? (
-                                        <View style={styles.downloadingContent}>
-                                            <ActivityIndicator size="small" color="#fff" />
-                                            <Text style={styles.downloadButtonText}>
-                                                {t('addedToQueue')}
-                                            </Text>
-                                        </View>
-                                    ) : (
-                                        <View style={styles.downloadContent}>
-                                            <Ionicons name="download-outline" size={20} color="#fff" />
-                                            <Text style={styles.downloadButtonText}>{t('downloadRom')}</Text>
-                                        </View>
-                                    )}
-                                </TouchableOpacity>
-                            )}
+                                    );
+                                }
+                            })()}
                         </View>
                     </View>
                 </View>
@@ -472,6 +537,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 10,
+        overflow: 'hidden', // Ensure progress bar stays within button bounds
+        position: 'relative', // Allow for absolute positioning of progress bar
     },
     downloadingButton: {
         backgroundColor: '#666',
@@ -485,6 +552,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
+        zIndex: 1, // Ensure content stays above progress bar
     },
     downloadButtonText: {
         color: '#fff',
@@ -502,8 +570,13 @@ const styles = StyleSheet.create({
     },
     progressFill: {
         height: '100%',
-        backgroundColor: '#5f43b2',
-        borderRadius: 2,
+        backgroundColor: 'rgba(95, 67, 178, 0.8)', // Semi-transparent version of button color
+        borderRadius: 12,
+    },
+    progressBackground: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 12,
+        overflow: 'hidden',
     },
     checkingContainer: {
         flexDirection: 'row',

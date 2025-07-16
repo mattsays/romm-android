@@ -1,3 +1,4 @@
+import { DownloadStatusBar } from '@/components/DownloadStatusBar';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -33,7 +34,7 @@ export default function PlatformScreen() {
     const { platform: currentPlatform, loading: platformLoading, error: platformError, fetchPlatform } = usePlatform();
     const { addToQueue, isDownloading, completedDownloads } = useDownload();
     const { getPlatformFolder, savePlatformFolder, hasPlatformFolder } = usePlatformFolders();
-    const { checkMultipleRoms, isRomDownloaded, isCheckingRom } = useRomFileSystem();
+    const { checkMultipleRoms, isRomDownloaded, isCheckingRom, refreshRomCheck } = useRomFileSystem();
     const { requestDirectoryPermissions } = useStorageAccessFramework();
     const { showSuccessToast, showErrorToast, showInfoToast } = useToast();
     const [isDownloadingAll, setIsDownloadingAll] = useState(false);
@@ -65,16 +66,16 @@ export default function PlatformScreen() {
 
     // Check filesystem for existing ROMs when ROMs are loaded
     useEffect(() => {
-        const checkRomFolders = async () => {
-            if (roms.length > 0) {
-                if (currentPlatform) {
-                    const folder = await getPlatformFolder(currentPlatform.slug);
-                    checkMultipleRoms(roms, folder?.folderUri || '');
-                }
-            }
-        };
         checkRomFolders();
     }, [roms, currentPlatform, checkMultipleRoms]);
+
+    // Monitor completed downloads to refresh ROM status
+    useEffect(() => {
+        if (completedDownloads.length > 0 && roms.length > 0 && currentPlatform) {
+            console.log('Completed downloads detected, rechecking ROM folders');
+            checkRomFolders();
+        }
+    }, [completedDownloads.length, roms.length, currentPlatform]);
 
     // // Check if platform folder is configured and request if not (only after ROMs are loaded)
     useEffect(() => {
@@ -89,6 +90,20 @@ export default function PlatformScreen() {
             checkFolder();
         }
     }, [roms, currentPlatform, hasPlatformFolder]);
+
+    const checkRomFolders = async () => {
+        if (roms.length > 0 && currentPlatform) {
+            console.log(`Checking ${roms.length} ROMs for platform ${currentPlatform.name}`);
+            const folder = await getPlatformFolder(currentPlatform.slug);
+            if (folder?.folderUri) {
+                console.log('Platform folder found, checking ROMs:', folder.folderUri);
+                await checkMultipleRoms(roms, folder.folderUri);
+                console.log('ROM check completed');
+            } else {
+                console.log('No platform folder configured for:', currentPlatform.slug);
+            }
+        }
+    };
 
     const showFolderSelectionDialog = async () => {
         if (!currentPlatform) return;
@@ -142,10 +157,20 @@ export default function PlatformScreen() {
         try {
             // Refresh both platform and ROMs data
             if (platformId && !isNaN(platformId)) {
-                await Promise.all([
-                    fetchPlatform(platformId),
-                    fetchRomsByPlatform(platformId)
-                ]);
+                await fetchPlatform(platformId);
+                await fetchRomsByPlatform(platformId);
+                console.log('Refreshing ROMs and platform data');
+
+                // Force a complete refresh of ROM checks
+                setTimeout(async () => {
+                    if (currentPlatform && roms.length > 0) {
+                        console.log('Force refreshing all ROM checks');
+                        for (const rom of roms) {
+                            await refreshRomCheck(rom);
+                        }
+                        console.log('All ROM checks refreshed');
+                    }
+                }, 500); // Small delay to ensure data is updated
             }
         } catch (error) {
             console.error('Error refreshing data:', error);
@@ -411,6 +436,8 @@ export default function PlatformScreen() {
                     ) : null
                 }
             />
+
+            <DownloadStatusBar onPress={() => router.push('/downloads')} />
         </View>
     );
 }
