@@ -56,7 +56,11 @@ export default function LoginScreen() {
 
             setConnectionStatus('checking');
             try {
+                const formattedUrl = formatUrl(serverUrl);
+                apiClient.updateBaseUrl(formattedUrl);
+
                 const isConnected = await apiClient.heartbeat();
+                console.log("Trying to connect to server:", formattedUrl);
                 setConnectionStatus(isConnected ? 'connected' : 'failed');
             } catch (error) {
                 console.error('Connection test failed:', error);
@@ -69,12 +73,29 @@ export default function LoginScreen() {
         }
     }, [serverUrl]);
 
+    const formatUrl = (url: string): string => {
+        if (!url.trim()) return url;
+
+        let formattedUrl = url.trim();
+
+        // Add http:// if no protocol is specified
+        if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+            formattedUrl = 'http://' + formattedUrl;
+        }
+
+        // Remove trailing slash
+        formattedUrl = formattedUrl.replace(/\/$/, '');
+
+        return formattedUrl;
+    };
+
     const handleUrlChange = async (newUrl: string) => {
         setServerUrl(newUrl);
         if (newUrl.trim()) {
             try {
-                apiClient.updateBaseUrl(newUrl);
-                await SecureStore.setItemAsync('server_url', newUrl);
+                const formattedUrl = formatUrl(newUrl);
+                apiClient.updateBaseUrl(formattedUrl);
+                await SecureStore.setItemAsync('server_url', formattedUrl);
             } catch (error) {
                 console.error('Failed to save URL:', error);
             }
@@ -89,12 +110,17 @@ export default function LoginScreen() {
 
         try {
             clearError();
+
+            // Ensure URL is properly formatted before login
+            const formattedUrl = formatUrl(serverUrl);
+            apiClient.updateBaseUrl(formattedUrl);
+
             await login(credentials);
 
-            // Save the server URL after successful login
-            if (serverUrl.trim()) {
+            // Save the formatted server URL after successful login
+            if (formattedUrl.trim()) {
                 try {
-                    await SecureStore.setItemAsync('server_url', serverUrl);
+                    await SecureStore.setItemAsync('server_url', formattedUrl);
                 } catch (error) {
                     console.error('Failed to save URL after login:', error);
                 }
@@ -150,7 +176,7 @@ export default function LoginScreen() {
                                 style={styles.input}
                                 value={serverUrl}
                                 onChangeText={handleUrlChange}
-                                placeholder="http://romm:8080"
+                                placeholder="192.168.1.100:8080"
                                 placeholderTextColor="#666"
                                 autoCapitalize="none"
                                 autoCorrect={false}
@@ -158,7 +184,8 @@ export default function LoginScreen() {
                                 keyboardType="url"
                             />
                             <Text style={styles.urlHint}>
-                                {t('serverUrlHint')}
+                                {t('serverUrlHint')} {'\n'}
+                                Es: 192.168.1.100:8080 o http://romm.local:8080
                             </Text>
                         </View>
 
