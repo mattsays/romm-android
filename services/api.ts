@@ -1,10 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
-//import { fetch } from 'expo/fetch';
 
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080';
-
-
+const DEFAULT_API_URL = 'http://romm:8080';
 
 // Authentication types
 export interface LoginCredentials {
@@ -126,9 +122,19 @@ class ApiClient {
     private sessionToken: string | null = null;
     private tokenLoaded: boolean = false;
 
-    constructor(baseUrl: string = API_BASE_URL) {
-        this.baseUrl = baseUrl;
-        this.loadTokenFromStorage();
+    constructor() {
+        // Try load url from secure storage
+        this.baseUrl = DEFAULT_API_URL; // Default URL
+        SecureStore.getItemAsync('server_url')
+            .then(url => {
+                if (url) {
+                    this.baseUrl = url.replace(/\/$/, ''); // Remove trailing slash if present
+                } else {
+                    this.baseUrl = DEFAULT_API_URL;
+                }
+                console.log('API base URL set to:', this.baseUrl);
+                this.loadTokenFromStorage();
+            });
     }
 
     // Method to update base URL

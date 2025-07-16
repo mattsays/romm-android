@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "romm-android",
-    "slug": "romm-android",
+    "name": "RomM",
+    "slug": "RomM",
     "version": "1.0.0",
     "orientation": "landscape",
     "icon": "./assets/images/icon.png",
@@ -23,10 +23,24 @@
     },
     "plugins": [
       "expo-router",
-      "expo-file-system"
+      "expo-file-system",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#f8e9ff",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "de44a04b-3068-4e9f-9474-7e9c3f73fbd9"
+      }
     }
   }
 }

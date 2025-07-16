@@ -23,8 +23,7 @@ export default function LoginScreen() {
         username: '',
         password: '',
     });
-    const [serverUrl, setServerUrl] = useState<string>('');
-    const [showUrlField, setShowUrlField] = useState<boolean>(false);
+    const [serverUrl, setServerUrl] = useState<string>('http://romm:8080');
     const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'failed'>('checking');
     const { login, isLoading, error, clearError } = useLogin();
     const { t } = useTranslation();
@@ -92,6 +91,16 @@ export default function LoginScreen() {
         try {
             clearError();
             await login(credentials);
+            
+            // Save the server URL after successful login
+            if (serverUrl.trim()) {
+                try {
+                    await SecureStore.setItemAsync('server_url', serverUrl);
+                } catch (error) {
+                    console.error('Failed to save URL after login:', error);
+                }
+            }
+            
             router.replace('/');
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : t('errorDuringLogin');
@@ -103,7 +112,6 @@ export default function LoginScreen() {
         <PublicRoute>
             <KeyboardAvoidingView
                 style={styles.container}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
                 <ScrollView contentContainerStyle={styles.scrollContainer}>
                     <View style={styles.formContainer}>
@@ -137,34 +145,23 @@ export default function LoginScreen() {
                         </View>
 
                         {/* Server URL Configuration */}
-                        <TouchableOpacity
-                            style={styles.urlToggleButton}
-                            onPress={() => setShowUrlField(!showUrlField)}
-                        >
-                            <Text style={styles.urlToggleText}>
-                                {showUrlField ? '▼' : '▶'} {t('configureServerUrl')}
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.label}>{t('serverUrl')}</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={serverUrl}
+                                onChangeText={handleUrlChange}
+                                placeholder="http://romm:8080"
+                                placeholderTextColor="#666"
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                editable={!isLoading}
+                                keyboardType="url"
+                            />
+                            <Text style={styles.urlHint}>
+                                {t('serverUrlHint')}
                             </Text>
-                        </TouchableOpacity>
-
-                        {showUrlField && (
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>{t('serverUrl')}</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={serverUrl}
-                                    onChangeText={handleUrlChange}
-                                    placeholder="http://localhost:8080"
-                                    placeholderTextColor="#666"
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                    editable={!isLoading}
-                                    keyboardType="url"
-                                />
-                                <Text style={styles.urlHint}>
-                                    {t('serverUrlHint')}
-                                </Text>
-                            </View>
-                        )}
+                        </View>
 
                         {error && (
                             <View style={styles.errorContainer}>
