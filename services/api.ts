@@ -295,13 +295,13 @@ class ApiClient {
         return this.request<Collection>(`/api/collections/${collectionId}`);
     }
 
-    async getRomsByCollection(collectionId: string, isVirtual: boolean): Promise<Rom[]> {
+    async getRomsByCollection(collectionId: string, isVirtual: boolean, limit: number = 10, offset: number = 0): Promise<Rom[]> {
         if (isVirtual) {
-            const response = await this.request<ItemsResponse<Rom>>(`/api/roms?virtual_collection_id=${collectionId}`);
+            const response = await this.request<ItemsResponse<Rom>>(`/api/roms?virtual_collection_id=${collectionId}&limit=${limit}&offset=${offset}`);
             return response.items;
         }
 
-        const response = await this.request<ItemsResponse<Rom>>(`/api/roms?collection_id=${collectionId}`);
+        const response = await this.request<ItemsResponse<Rom>>(`/api/roms?collection_id=${collectionId}&limit=${limit}&offset=${offset}`);
         return response.items;
     }
 

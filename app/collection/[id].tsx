@@ -24,7 +24,7 @@ import { usePlatformFolders } from '../../hooks/usePlatformFolders';
 import { useRomFileSystem } from '../../hooks/useRomFileSystem';
 import { useRomsByCollection } from '../../hooks/useRoms';
 import { useTranslation } from '../../hooks/useTranslation';
-import { apiClient, Collection as ApiCollection, Rom } from '../../services/api';
+import { apiClient, Collection as ApiCollection, Platform, Rom } from '../../services/api';
 
 interface CollectionScreenProps { }
 
@@ -40,7 +40,7 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
     const { activeDownloads, addToQueue, isDownloading, completedDownloads } = useDownload();
     const { downloadRom } = useRomDownload();
     const { showErrorToast, showInfoToast, showSuccessToast } = useToast();
-    const { platformFolders, getPlatformFolder } = usePlatformFolders();
+    const { platformFolders, searchPlatformFolder } = usePlatformFolders();
     const { checkMultipleRoms, isRomDownloaded, isCheckingRom, refreshRomCheck } = useRomFileSystem();
     const insets = useSafeAreaInsets();
 
@@ -78,34 +78,14 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
 
     // Check filesystem for existing ROMs when ROMs are loaded
     useEffect(() => {
-        checkCollectionRomFolders();
-    }, [roms, platformFolders, checkMultipleRoms]);
+        Promise.all(roms.map(rom => refreshRomCheck(rom)))
+    }, [roms, platformFolders]);
 
     // Monitor completed downloads to refresh ROM status in collection view
     useEffect(() => {
-        if (completedDownloads.length > 0 && roms && roms.length > 0) {
-            console.log('Completed downloads detected in collection, rechecking ROM folders');
-            checkCollectionRomFolders();
-        }
-    }, [completedDownloads.length, roms?.length]);
+        Promise.all(completedDownloads.map(downloadedItem => refreshRomCheck(downloadedItem.rom)));
+    }, [completedDownloads.length, roms.length]);
 
-    const checkCollectionRomFolders = async () => {
-        if (roms && roms.length > 0) {
-            console.log(`Checking ${roms.length} ROMs in collection ${collection?.name}`);
-            for (const rom of roms) {
-                const platformFolder = platformFolders.find(
-                    folder => folder.platformSlug === rom.platform_slug
-                );
-                if (platformFolder) {
-                    console.log(`Checking ROM ${rom.fs_name} in platform ${rom.platform_name}`);
-                    await checkMultipleRoms([rom], platformFolder.folderUri);
-                } else {
-                    console.log(`No platform folder found for ${rom.platform_name} (${rom.platform_slug})`);
-                }
-            }
-            console.log('Collection ROM check completed');
-        }
-    };
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -135,7 +115,6 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
 
         try {
             await downloadRom(rom);
-
         } catch (error: any) {
             console.error('Download error:', error);
 
@@ -158,15 +137,17 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
         }
 
         // Get all unique platforms from the collection's ROMs
-        const uniquePlatforms = [...new Set(roms.map(rom => rom.platform_slug))];
+        const uniquePlatforms = [...new Set(roms.map(rom => ({name: rom.platform_name, slug: rom.platform_slug } as Platform)))];
 
         // Check if all platforms have configured folders
         const missingFolders: string[] = [];
-        for (const platformSlug of uniquePlatforms) {
-            const platformFolder = await getPlatformFolder(platformSlug);
+        for (const platform of uniquePlatforms) {
+            const platformFolder = await searchPlatformFolder(platform);
             if (!platformFolder) {
-                const platform = roms.find(rom => rom.platform_slug === platformSlug);
-                missingFolders.push(platform?.platform_name || platformSlug);
+                const missingFolderRom = roms.find(rom => rom.platform_slug === platform?.slug);
+                if (missingFolderRom) {
+                    missingFolders.push(platform.name);
+                }
             }
         }
 
@@ -199,7 +180,7 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
                         try {
                             // Add all ROMs to download queue with their respective platform folders
                             for (const rom of romsToDownload) {
-                                const platformFolder = await getPlatformFolder(rom.platform_slug);
+                                const platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
                                 if (platformFolder) {
                                     addToQueue(rom, platformFolder);
                                 }

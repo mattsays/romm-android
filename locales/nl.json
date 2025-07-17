@@ -166,5 +166,17 @@
     "languageDescription": "Kies je voorkeurstaal voor de applicatie-interface",
     "languageChanged": "Taal succesvol gewijzigd",
     "permissionsNotGranted": "Machtigingen niet verleend",
-    "permissionsNotGrantedMessage": "Je hebt geen machtigingen verleend om toegang te krijgen tot de map. Probeer opnieuw."
+    "permissionsNotGrantedMessage": "Je hebt geen machtigingen verleend om toegang te krijgen tot de map. Probeer opnieuw.",
+    "baseFolderRequired": "Basismap Vereist",
+    "baseFolderRequiredMessage": "Om deze app te gebruiken, moet je een basismap configureren waar ROMs worden opgeslagen. Deze map wordt gebruikt om ROMs per platform te organiseren.",
+    "selectBaseFolder": "Selecteer Basismap",
+    "baseFolderConfigured": "Basismap succesvol geconfigureerd!",
+    "createFolder": "Map Maken",
+    "errorCreatingFolder": "Fout bij het maken van map",
+    "folderSelectionFailed": "Mapselectie mislukt voor platform {{platform}}. Probeer opnieuw.",
+    "baseFolder": "Basismap",
+    "baseFolderDescription": "Configureer de hoofdmap waar alle ROMs per platform worden georganiseerd",
+    "confirmRemoveBaseFolder": "Weet je zeker dat je de basismap wilt verwijderen?",
+    "baseFolderRemoved": "Basismap succesvol verwijderd",
+    "errorRemovingBaseFolder": "Fout bij het verwijderen van basismap"
 }

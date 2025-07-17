@@ -1,6 +1,7 @@
+import * as SAF from '@joplin/react-native-saf-x';
 import * as FileSystem from 'expo-file-system';
 import { useCallback, useMemo, useState } from 'react';
-import { Rom } from '../services/api';
+import { Platform, Rom } from '../services/api';
 import { usePlatformFolders } from './usePlatformFolders';
 
 
@@ -10,7 +11,7 @@ interface RomHash {
 }
 
 export const useRomFileSystem = () => {
-    const { getPlatformFolder } = usePlatformFolders();
+    const { searchPlatformFolder } = usePlatformFolders();
     const [fileChecks, setFileChecks] = useState<Record<number, boolean>>({});
     const [checking, setChecking] = useState<Record<number, boolean>>({});
 
@@ -22,60 +23,38 @@ export const useRomFileSystem = () => {
         }
 
         const platformSlug = rom.platform_slug;
-        const platformFolder = await getPlatformFolder(platformSlug);
+        const platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: platformSlug } as Platform);
 
         if (!platformFolder) {
             return false;
         }
 
         try {
-            setChecking(prev => ({ ...prev, [rom.id]: true }));
-
             // Read all files in the platform folder
-            const files = await FileSystem.StorageAccessFramework.readDirectoryAsync(
-                platformFolder.folderUri
+            const romExists = await SAF.exists(
+                platformFolder.folderUri + '/' + rom.fs_name
             );
 
-            // Check each file to see if it matches file name
-            for (const fileUri of files) {
-                try {
-                    // Check if the file name matches what we're looking for
-                    const decodedUri = decodeURIComponent(fileUri);
-                    const fileName = decodedUri.split('/').pop() || '';
-
-                    // If the file name matches set the fileChecks state
-                    if (fileName === rom.fs_name || fileName.includes(rom.fs_name.split('.')[0])) {
-                        console.log('Already downloaded file found!');
-                        const exists = true;
-                        setFileChecks(prev => ({ ...prev, [rom.id]: exists }));
-                        return exists;
-                    }
-                } catch (fileError) {
-                    console.warn(`Error checking file ${fileUri}:`, fileError);
-                    // Continue checking other files even if one fails
-                }
+            if (romExists) {
+                console.log('ROM already exists in the folder:', rom.fs_name);
+                setFileChecks(prev => ({ ...prev, [rom.id]: true }));
+                return true;
             }
 
-            console.log('File not found in folder');
-            const exists = false;
-            setFileChecks(prev => ({ ...prev, [rom.id]: exists }));
-            return exists;
+            setFileChecks(prev => ({ ...prev, [rom.id]: false }));
+            return false;
 
         } catch (error) {
             console.error('Error checking existing files:', error);
             const exists = false;
             setFileChecks(prev => ({ ...prev, [rom.id]: exists }));
             return exists;
-        } finally {
-            setChecking(prev => ({ ...prev, [rom.id]: false }));
         }
-    }, [getPlatformFolder]);
+
+
+    }, [searchPlatformFolder]);
 
     const isRomDownloaded = useCallback((romId: number): boolean => {
-        // console.log('Controllo se ROM è scaricata:', romId);
-        // console.log('Nome della ROM:', romId);
-        // console.log('File checks:', fileChecks);
-        // console.log('Checking state:', fileChecks[romId] || false);
         return fileChecks[romId] || false;
     }, [fileChecks]);
 
@@ -99,33 +78,30 @@ export const useRomFileSystem = () => {
             return;
         }
 
-        var files = await FileSystem.StorageAccessFramework.readDirectoryAsync(
-            platformFolderUri
-        );
-
         for (const rom of romsToCheck) {
-            for (const fileUri of files) {
-                if (decodeURIComponent(fileUri).includes(rom.fs_name)) {
-                    setFileChecks(prev => ({ ...prev, [rom.id]: true }));
-                    files = files.filter(f => f !== fileUri); // Remove file from the list of files to check
-                    break; // No need to check further files for this ROM
-                }
-            }
+            await checkIfRomExists(rom);
         }
 
     }, [checkIfRomExists, fileChecks, checking]);
 
     const refreshRomCheck = useCallback(async (rom: Rom): Promise<boolean> => {
-        // Force refresh by removing from cache
-        setFileChecks(prev => {
-            const newChecks = { ...prev };
-            delete newChecks[rom.id];
-            return newChecks;
-        });
+        if(fileChecks[rom.id] == true) {
+            // If already checked and exists, return true
+            return true;
+        }
+
         return await checkIfRomExists(rom);
     }, [checkIfRomExists]);
 
+    const resetRomsCheck = useCallback((roms: Rom[]) => {
+        roms.forEach((rom, _) => {
+            setFileChecks(prev => ({ ...prev, [rom.id]: false }));
+            setChecking(prev => ({ ...prev, [rom.id]: false }));
+        });
+    }, []);
+
     const memoizedReturn = useMemo(() => ({
+        resetRomsCheck,
         checkIfRomExists,
         isRomDownloaded,
         isCheckingRom,
@@ -134,6 +110,7 @@ export const useRomFileSystem = () => {
         fileChecks,
         checking
     }), [
+        resetRomsCheck,
         checkIfRomExists,
         isRomDownloaded,
         isCheckingRom,

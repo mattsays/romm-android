@@ -11,9 +11,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <LanguageProvider>
-        <AuthProvider>
-          <DownloadProvider>
-            <ToastProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <DownloadProvider>
               <StatusBar style="light" />
               <Stack
                 screenOptions={{
@@ -31,9 +31,9 @@ export default function RootLayout() {
                 }}
               />
               <Toast />
-            </ToastProvider>
-          </DownloadProvider>
-        </AuthProvider>
+            </DownloadProvider>
+          </AuthProvider>
+        </ToastProvider>
       </LanguageProvider>
     </SafeAreaProvider>
   );

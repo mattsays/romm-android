@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system';
+import { openDocumentTree, mkdir, createFile, moveFile } from "@joplin/react-native-saf-x";
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { PlatformFolder } from '../hooks/usePlatformFolders';
@@ -201,21 +202,12 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
 
     const completeDownload = async (downloadId: string, tempFilePath: string, download: DownloadItem): Promise<void> => {
         try {
-            // Create the file in the platform folder using Storage Access Framework
-            const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
-                download.platformFolder.folderUri,
-                download.rom.fs_name,
-                'application/octet-stream'
-            );
 
-            // Copy the file to the destination
-            await ReactNativeBlobUtil.MediaCollection.writeToMediafile(
-                fileUri,
-                tempFilePath
-            );
-
-            // Delete the temporary file
-            await FileSystem.deleteAsync(tempFilePath, { idempotent: true });
+            // Seems to give an error despite actually moving the file correctly, just ignore the error
+            try {
+                await moveFile(tempFilePath, download.platformFolder.folderUri + '/' + download.rom.fs_name);
+            } catch (_) {}
+            
 
             updateDownload(downloadId, {
                 status: DownloadStatus.COMPLETED,

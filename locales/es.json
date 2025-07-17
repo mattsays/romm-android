@@ -166,5 +166,17 @@
     "languageDescription": "Elige tu idioma preferido para la interfaz de la aplicación",
     "languageChanged": "Idioma cambiado exitosamente",
     "permissionsNotGranted": "Permisos no concedidos",
-    "permissionsNotGrantedMessage": "No has concedido permisos para acceder a la carpeta. Inténtalo de nuevo."
+    "permissionsNotGrantedMessage": "No has concedido permisos para acceder a la carpeta. Inténtalo de nuevo.",
+    "baseFolderRequired": "Carpeta Base Requerida",
+    "baseFolderRequiredMessage": "Para usar esta app, necesitas configurar una carpeta base donde se almacenarán las ROMs. Esta carpeta se usará para organizar las ROMs por plataforma.",
+    "selectBaseFolder": "Seleccionar Carpeta Base",
+    "baseFolderConfigured": "¡Carpeta base configurada exitosamente!",
+    "createFolder": "Crear Carpeta",
+    "errorCreatingFolder": "Error al crear la carpeta",
+    "folderSelectionFailed": "Falló la selección de carpeta para la plataforma {{platform}}. Por favor, inténtalo de nuevo.",
+    "baseFolder": "Carpeta Base",
+    "baseFolderDescription": "Configura la carpeta principal donde se organizarán todas las ROMs por plataforma",
+    "confirmRemoveBaseFolder": "¿Estás seguro de que quieres eliminar la carpeta base?",
+    "baseFolderRemoved": "Carpeta base eliminada exitosamente",
+    "errorRemovingBaseFolder": "Error al eliminar la carpeta base"
 }

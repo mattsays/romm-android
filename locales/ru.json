@@ -101,6 +101,7 @@
     "clearFailed": "Очистить неудачные",
     "confirmDownload": "Подтвердить загрузку",
     "downloadAllRomsQuestion": "Хотите скачать {{count}} ROM для {{platform}}?",
+    "downloadAllRomsQuestionCollection": "Хотите скачать все ROM в коллекции \"{{collection}}\"?",
     "downloadAllStarted": "Массовая загрузка начата",
     "romsAddedToQueue": "{{count}} ROM добавлены в очередь загрузки.",
     "errorAddingToQueue": "Ошибка добавления ROM в очередь загрузки.",
@@ -165,5 +166,17 @@
     "languageDescription": "Выберите предпочитаемый язык для интерфейса приложения",
     "languageChanged": "Язык успешно изменен",
     "permissionsNotGranted": "Разрешения не предоставлены",
-    "permissionsNotGrantedMessage": "Вы не предоставили разрешения для доступа к папке. Попробуйте снова."
+    "permissionsNotGrantedMessage": "Вы не предоставили разрешения для доступа к папке. Попробуйте снова.",
+    "baseFolderRequired": "Требуется базовая папка",
+    "baseFolderRequiredMessage": "Для использования этого приложения необходимо настроить базовую папку, где будут храниться ROM. Эта папка будет использоваться для организации ROM по платформам.",
+    "selectBaseFolder": "Выбрать базовую папку",
+    "baseFolderConfigured": "Базовая папка успешно настроена!",
+    "createFolder": "Создать папку",
+    "errorCreatingFolder": "Ошибка создания папки",
+    "folderSelectionFailed": "Не удалось выбрать папку для платформы {{platform}}. Попробуйте снова.",
+    "baseFolder": "Базовая папка",
+    "baseFolderDescription": "Настройте основную папку, где все ROM будут организованы по платформам",
+    "confirmRemoveBaseFolder": "Вы уверены, что хотите удалить базовую папку?",
+    "baseFolderRemoved": "Базовая папка успешно удалена",
+    "errorRemovingBaseFolder": "Ошибка удаления базовой папки"
 }

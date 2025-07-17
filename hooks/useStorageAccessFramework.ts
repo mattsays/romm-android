@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system';
+import { openDocumentTree, mkdir, createFile } from "@joplin/react-native-saf-x";
 import { useTranslation } from './useTranslation';
 
 export interface StorageAccessError extends Error {
@@ -12,17 +13,24 @@ export const useStorageAccessFramework = () => {
     const requestDirectoryPermissions = async (): Promise<string | null> => {
         try {
             // Use SAF to pick a directory
-            const result = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+            const result = await openDocumentTree(true);
+            console.log('SAF result:', result);
 
-            if (result.granted) {
-                console.log('Directory permissions granted:', result.directoryUri);
-                return result.directoryUri;
-            } else {
-                console.warn('Directory permissions not granted');
+            if (!result || !result.uri) {
                 const error = new Error(t('permissionsNotGrantedMessage')) as StorageAccessError;
                 error.type = 'permissions_denied';
                 throw error;
             }
+
+            return result.uri;
+            // if (result.granted) {
+                
+            // } else {
+            //     console.warn('Directory permissions not granted');
+            //     const error = new Error(t('permissionsNotGrantedMessage')) as StorageAccessError;
+            //     error.type = 'permissions_denied';
+            //     throw error;
+            // }
         } catch (error) {
             console.error('Error requesting directory permissions:', error);
             if ((error as StorageAccessError).type) {

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
+import * as SAF from '@joplin/react-native-saf-x';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -19,7 +19,7 @@ import { usePlatformFolders } from '../../hooks/usePlatformFolders';
 import { useRomDownload } from '../../hooks/useRomDownload';
 import { useRomFileSystem } from '../../hooks/useRomFileSystem';
 import { useTranslation } from '../../hooks/useTranslation';
-import { apiClient, Rom } from '../../services/api';
+import { apiClient, Platform, Rom } from '../../services/api';
 
 export default function GameDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,8 +32,8 @@ export default function GameDetailsScreen() {
     const [existingFilePath, setExistingFilePath] = useState<string | null>(null);
     const { downloadRom, isRomDownloading } = useRomDownload();
     const { getDownloadById, completedDownloads, activeDownloads } = useDownload();
-    const { getPlatformFolder } = usePlatformFolders();
-    const { checkIfRomExists, isRomDownloaded, isCheckingRom, refreshRomCheck } = useRomFileSystem();
+    const { searchPlatformFolder } = usePlatformFolders();
+    const { isRomDownloaded, isCheckingRom, refreshRomCheck, resetRomsCheck } = useRomFileSystem();
 
     // Ref per tenere traccia dei download completati già processati
     const processedDownloadsRef = useRef<Set<string>>(new Set());
@@ -110,7 +110,7 @@ export default function GameDetailsScreen() {
         try {
             console.log('Updating existing file path for ROM:', rom.fs_name);
             const platformSlug = rom.platform_slug;
-            const platformFolder = await getPlatformFolder(platformSlug);
+            const platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
 
             if (!platformFolder) {
                 console.log('No platform folder found for:', platformSlug);
@@ -119,28 +119,15 @@ export default function GameDetailsScreen() {
             }
 
             console.log('Platform folder found:', platformFolder.folderUri);
-            // Read all files in the platform folder
-            const files = await FileSystem.StorageAccessFramework.readDirectoryAsync(
-                platformFolder.folderUri
+            
+            // Check if the ROM file exists in the platform folder
+            const romExists = await SAF.exists(
+                platformFolder.folderUri + '/' + rom.fs_name
             );
 
-            console.log(`Found ${files.length} files in platform folder`);
-            // Check each file to see if it matches our ROM
-            for (const fileUri of files) {
-                try {
-                    const decodedUri = decodeURIComponent(fileUri);
-                    const fileName = decodedUri.split('/').pop() || '';
-                    console.log('Checking file:', fileName, 'against ROM:', rom.fs_name);
-
-                    // If the file name matches, set the path
-                    if (fileName === rom.fs_name || fileName.includes(rom.fs_name.split('.')[0])) {
-                        console.log('File match found:', decodedUri);
-                        setExistingFilePath(decodedUri);
-                        return;
-                    }
-                } catch (fileError) {
-                    console.warn(`Error checking file ${fileUri}:`, fileError);
-                }
+            if(romExists) {
+                setExistingFilePath(platformFolder.folderUri + '/' + rom.fs_name);
+                return;
             }
 
             console.log('No matching file found for ROM:', rom.fs_name);
@@ -196,40 +183,31 @@ export default function GameDetailsScreen() {
                     onPress: async () => {
                         try {
                             // Try to delete the file using Storage Access Framework
-                            const platformSlug = rom.platform_slug;
-                            const platformFolder = await getPlatformFolder(platformSlug);
+                            const platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
 
                             if (!platformFolder) {
                                 throw new Error(t('platformFolderNotFound'));
                             }
 
-                            // Get all files in the platform folder
-                            const files = await FileSystem.StorageAccessFramework.readDirectoryAsync(
-                                platformFolder.folderUri
+                            const romExists = await SAF.exists(
+                                platformFolder.folderUri + '/' + rom.fs_name
                             );
 
-                            // Find the file to delete
-                            const fileToDelete = files.find(fileUri => {
-                                const decodedUri = decodeURIComponent(fileUri);
-                                const fileName = decodedUri.split('/').pop() || '';
-                                return fileName === rom.fs_name || fileName.includes(rom.fs_name.split('.')[0]);
-                            });
-
-                            if (fileToDelete) {
-                                await FileSystem.StorageAccessFramework.deleteAsync(fileToDelete);
+                            if (romExists) {
+                                await SAF.unlink(
+                                    platformFolder.folderUri + '/' + rom.fs_name
+                                );
 
                                 // Update the state to reflect that the file is no longer downloaded
                                 setExistingFilePath(null);
                                 // Refresh the ROM check in the global state
-                                await refreshRomCheck(rom);
+                                resetRomsCheck([rom])
 
                                 showSuccessToast(
                                     t('fileDeletedSuccessfully'),
                                     t('fileDeleted')
                                 );
-                            } else {
-                                throw new Error(t('fileNotFound'));
-                            }
+                            }                            
                         } catch (error) {
                             console.error('Error deleting file:', error);
                             const errorMessage = error instanceof Error ? error.message : t('errorDeletingFile');
@@ -323,15 +301,6 @@ export default function GameDetailsScreen() {
                                 const isDownloaded = rom && isRomDownloaded(rom.id);
                                 const isChecking = rom && isCheckingRom(rom.id);
                                 const isCurrentlyDownloading = rom && isRomDownloading(rom.id);
-
-                                console.log('ROM Status Check:', {
-                                    romId: rom?.id,
-                                    romName: rom?.fs_name,
-                                    isDownloaded,
-                                    isChecking,
-                                    isCurrentlyDownloading,
-                                    hasExistingPath: !!existingFilePath
-                                });
 
                                 if (isChecking) {
                                     return (

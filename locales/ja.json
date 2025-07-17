@@ -166,5 +166,17 @@
     "languageDescription": "アプリケーションインターフェースの希望言語を選択してください",
     "languageChanged": "言語が正常に変更されました",
     "permissionsNotGranted": "権限が付与されていません",
-    "permissionsNotGrantedMessage": "フォルダにアクセスする権限が付与されていません。再試行してください。"
+    "permissionsNotGrantedMessage": "フォルダにアクセスする権限が付与されていません。再試行してください。",
+    "baseFolderRequired": "ベースフォルダが必要",
+    "baseFolderRequiredMessage": "このアプリを使用するには、ROMが保存されるベースフォルダを設定する必要があります。このフォルダは、プラットフォーム別にROMを整理するために使用されます。",
+    "selectBaseFolder": "ベースフォルダを選択",
+    "baseFolderConfigured": "ベースフォルダが正常に設定されました！",
+    "createFolder": "フォルダを作成",
+    "errorCreatingFolder": "フォルダの作成エラー",
+    "folderSelectionFailed": "プラットフォーム{{platform}}のフォルダ選択に失敗しました。再試行してください。",
+    "baseFolder": "ベースフォルダ",
+    "baseFolderDescription": "すべてのROMがプラットフォーム別に整理されるメインフォルダを設定します",
+    "confirmRemoveBaseFolder": "ベースフォルダを削除してもよろしいですか？",
+    "baseFolderRemoved": "ベースフォルダが正常に削除されました",
+    "errorRemovingBaseFolder": "ベースフォルダの削除エラー"
 }

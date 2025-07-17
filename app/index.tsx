@@ -17,6 +17,7 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BaseFolderModal } from '../components/BaseFolderModal';
 import { CollectionCoverGrid } from '../components/CollectionCoverGrid';
 import { DownloadStatusBar } from '../components/DownloadStatusBar';
 import { ProtectedRoute } from '../components/ProtectedRoute';
@@ -44,15 +45,34 @@ export default function LibraryScreen() {
     const [recentRomsLoading, setRecentRomsLoading] = useState(false);
     const { activeDownloads, isDownloading, completedDownloads } = useDownload();
     const { downloadRom } = useRomDownload();
-    const { platformFolders } = usePlatformFolders();
-    const { checkMultipleRoms, isRomDownloaded, isCheckingRom } = useRomFileSystem();
+    const { platformFolders, hasBaseFolder } = usePlatformFolders();
+    const { resetRomsCheck, refreshRomCheck, isRomDownloaded, isCheckingRom } = useRomFileSystem();
     const insets = useSafeAreaInsets();
+    const [showBaseFolderModal, setShowBaseFolderModal] = useState(false);
+    const [baseFolderChecked, setBaseFolderChecked] = useState(false);
+
+    const loadRecentRoms = async (needResetRom: boolean = false) => {
+        await fetchRecentlyAddedRoms();
+        if (recentlyAddedRoms && recentlyAddedRoms.length > 0) {
+            if (needResetRom) {
+                resetRomsCheck(recentlyAddedRoms);
+            }
+            await Promise.all(recentlyAddedRoms.map(rom => refreshRomCheck(rom)));
+        }
+    };
 
     // Function for refresh
     const onRefresh = async () => {
         setRefreshing(true);
         try {
-            await Promise.all([fetchPlatforms(), fetchCollections(), fetchRecentlyAddedRoms()]);
+            await Promise.all([
+                fetchPlatforms(),
+                fetchCollections(),
+                loadRecentRoms(true),
+            ]);
+            console.log('Refresh completed');
+            setRefreshing(false);
+            
         } catch (error) {
             console.error('Error during refresh:', error);
         } finally {
@@ -60,65 +80,59 @@ export default function LibraryScreen() {
         }
     };
 
-    // Function to load recent ROMs
-    const loadRecentRoms = async () => {
-        setRecentRomsLoading(true);
-        try {
-            await fetchRecentlyAddedRoms();
-        } catch (error) {
-            console.error('Error loading recent ROMs:', error);
-        } finally {
-            setRecentRomsLoading(false);
-        }
-    };
-
     // Fetch platforms only after authentication is verified
     useEffect(() => {
         console.log('isAuthenticated:', isAuthenticated);
         if (isAuthenticated) {
-            fetchPlatforms();
-            fetchCollections();
-            fetchRecentlyAddedRoms();
+            
+            Promise.all([
+                fetchPlatforms(),
+                fetchCollections(),
+                loadRecentRoms(true)
+            ]);
         }
-    }, [isAuthenticated, fetchPlatforms, fetchCollections]);
+    }, [isAuthenticated]);
 
-    // Check filesystem for existing ROMs when recently added ROMs are loaded
     useEffect(() => {
-        const checkRecentRomFolders = async () => {
-            if (recentlyAddedRoms && recentlyAddedRoms.length > 0) {
-                for (const rom of recentlyAddedRoms) {
-                    const platformFolder = platformFolders.find(
-                        folder => folder.platformSlug === rom.platform_slug
-                    );
-                    if (platformFolder) {
-                        checkMultipleRoms([rom], platformFolder.folderUri);
+        resetRomsCheck(recentlyAddedRoms);
+    }, []);
+
+    // Check for base folder when authenticated
+    useEffect(() => {
+        const checkBaseFolderRequired = async () => {
+            if (isAuthenticated && !baseFolderChecked) {
+                try {
+                    const hasFolder = await hasBaseFolder();
+                    if (!hasFolder) {
+                        setShowBaseFolderModal(true);
                     }
+                } catch (error) {
+                    console.error('Error checking base folder:', error);
+                } finally {
+                    setBaseFolderChecked(true);
                 }
             }
         };
-        checkRecentRomFolders();
-    }, [recentlyAddedRoms, platformFolders, checkMultipleRoms]);
+
+        checkBaseFolderRequired();
+    }, [isAuthenticated, baseFolderChecked, hasBaseFolder]);
+
+    // // Check filesystem for existing ROMs when recently added ROMs are loaded
+    // useEffect(() => {
+    //     const checkRecentRomFolders = async () => {
+    //         if (recentlyAddedRoms && recentlyAddedRoms.length > 0) {
+    //             for (const rom of recentlyAddedRoms) {
+    //                 //await refreshRomCheck(rom);
+    //             }
+    //         }
+    //     };
+    //     checkRecentRomFolders();
+    // }, [recentlyAddedRoms, platformFolders, refreshRomCheck]);
 
     // Monitor completed downloads to refresh ROM status
     useEffect(() => {
-        const lastCompletedCount = completedDownloads.length;
-        if (lastCompletedCount > 0) {
-            // Re-check filesystem for recent ROMs when downloads complete
-            const checkRecentRomFoldersAfterDownload = async () => {
-                if (recentlyAddedRoms && recentlyAddedRoms.length > 0) {
-                    for (const rom of recentlyAddedRoms) {
-                        const platformFolder = platformFolders.find(
-                            folder => folder.platformSlug === rom.platform_slug
-                        );
-                        if (platformFolder) {
-                            checkMultipleRoms([rom], platformFolder.folderUri);
-                        }
-                    }
-                }
-            };
-            checkRecentRomFoldersAfterDownload();
-        }
-    }, [completedDownloads.length, recentlyAddedRoms, platformFolders, checkMultipleRoms]);
+        Promise.all(completedDownloads.map(downloadedItem => refreshRomCheck(downloadedItem.rom)));
+    }, [completedDownloads.length]);
 
     const handleLogout = async () => {
         Alert.alert(
@@ -174,6 +188,11 @@ export default function LibraryScreen() {
                 );
             }
         }
+    };
+
+    const handleBaseFolderComplete = () => {
+        setShowBaseFolderModal(false);
+        setBaseFolderChecked(true);
     };
 
     const PlatformCard = ({ platform }: { platform: ApiPlatform }) => (
@@ -433,6 +452,10 @@ export default function LibraryScreen() {
                 </ScrollView>
                 <DownloadStatusBar onPress={() => router.push('/downloads')} />
             </View>
+            <BaseFolderModal
+                visible={showBaseFolderModal}
+                onComplete={handleBaseFolderComplete}
+            />
         </ProtectedRoute>
     );
 }

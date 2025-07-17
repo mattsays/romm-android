@@ -166,5 +166,17 @@
     "languageDescription": "Choisissez votre langue préférée pour l'interface de l'application",
     "languageChanged": "Langue changée avec succès",
     "permissionsNotGranted": "Permissions non accordées",
-    "permissionsNotGrantedMessage": "Vous n'avez pas accordé les permissions pour accéder au dossier. Veuillez réessayer."
+    "permissionsNotGrantedMessage": "Vous n'avez pas accordé les permissions pour accéder au dossier. Veuillez réessayer.",
+    "baseFolderRequired": "Dossier de base requis",
+    "baseFolderRequiredMessage": "Pour utiliser cette application, vous devez configurer un dossier de base où les ROMs seront stockées. Ce dossier sera utilisé pour organiser les ROMs par plateforme.",
+    "selectBaseFolder": "Sélectionner le dossier de base",
+    "baseFolderConfigured": "Dossier de base configuré avec succès!",
+    "createFolder": "Créer un dossier",
+    "errorCreatingFolder": "Erreur lors de la création du dossier",
+    "folderSelectionFailed": "La sélection du dossier a échoué pour la plateforme {{platform}}. Veuillez réessayer.",
+    "baseFolder": "Dossier de Base",
+    "baseFolderDescription": "Configurez le dossier principal où toutes les ROMs seront organisées par plateforme",
+    "confirmRemoveBaseFolder": "Êtes-vous sûr de vouloir supprimer le dossier de base?",
+    "baseFolderRemoved": "Dossier de base supprimé avec succès",
+    "errorRemovingBaseFolder": "Erreur lors de la suppression du dossier de base"
 }

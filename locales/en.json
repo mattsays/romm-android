@@ -166,5 +166,17 @@
     "languageDescription": "Choose your preferred language for the application interface",
     "languageChanged": "Language changed successfully",
     "permissionsNotGranted": "Permissions not granted",
-    "permissionsNotGrantedMessage": "You have not granted permissions to access the folder. Please try again."
+    "permissionsNotGrantedMessage": "You have not granted permissions to access the folder. Please try again.",
+    "baseFolderRequired": "Base Folder Required",
+    "baseFolderRequiredMessage": "To use this app, you need to configure a base folder where ROMs will be stored. This folder will be used to organize ROMs by platform.",
+    "selectBaseFolder": "Select Base Folder",
+    "baseFolderConfigured": "Base folder configured successfully!",
+    "createFolder": "Create Folder",
+    "errorCreatingFolder": "Error creating folder",
+    "folderSelectionFailed": "Folder selection failed for platform {{platform}}. Please try again.",
+    "baseFolder": "Base Folder",
+    "baseFolderDescription": "Configure the main folder where all ROMs will be organized by platform",
+    "confirmRemoveBaseFolder": "Are you sure you want to remove the base folder?",
+    "baseFolderRemoved": "Base folder removed successfully",
+    "errorRemovingBaseFolder": "Error removing base folder"
 }

@@ -31,8 +31,8 @@ export default function PlatformScreen() {
     const { roms, loading: romsLoading, error: romsError, fetchRomsByPlatform } = useRoms();
     const { platform: currentPlatform, loading: platformLoading, error: platformError, fetchPlatform } = usePlatform();
     const { addToQueue, isDownloading, completedDownloads } = useDownload();
-    const { getPlatformFolder, savePlatformFolder, hasPlatformFolder } = usePlatformFolders();
-    const { checkMultipleRoms, isRomDownloaded, isCheckingRom, refreshRomCheck } = useRomFileSystem();
+    const { requestPlatformFolder, searchPlatformFolder, hasPlatformFolder } = usePlatformFolders();
+    const { isRomDownloaded, isCheckingRom, refreshRomCheck } = useRomFileSystem();
     const { requestDirectoryPermissions } = useStorageAccessFramework();
     const { showSuccessToast, showErrorToast, showInfoToast } = useToast();
     const [isDownloadingAll, setIsDownloadingAll] = useState(false);
@@ -65,93 +65,28 @@ export default function PlatformScreen() {
         fetchRomsByPlatform(platformId);
     }, [platformId, fetchRomsByPlatform]);
 
-    // Check filesystem for existing ROMs when ROMs are loaded
-    useEffect(() => {
-        checkRomFolders();
-    }, [roms, currentPlatform, checkMultipleRoms]);
-
     // Monitor completed downloads to refresh ROM status
     useEffect(() => {
-        if (completedDownloads.length > 0 && roms.length > 0 && currentPlatform) {
-            console.log('Completed downloads detected, rechecking ROM folders');
-            checkRomFolders();
-        }
+        Promise.all(completedDownloads.map(downloadedItem => refreshRomCheck(downloadedItem.rom)));
     }, [completedDownloads.length, roms.length, currentPlatform]);
 
     // // Check if platform folder is configured and request if not (only after ROMs are loaded)
     useEffect(() => {
         if (currentPlatform && roms.length > 0 && !folderSelectionShown) {
             const checkFolder = async () => {
-                const hasFolder = await hasPlatformFolder(currentPlatform.slug);
-                if (!hasFolder) {
+                const platformFolder = await searchPlatformFolder(currentPlatform);
+                if (!platformFolder) {
                     setFolderSelectionShown(true);
-                    await showFolderSelectionDialog();
+                    await requestPlatformFolder(currentPlatform);
                 }
             };
             checkFolder();
         }
     }, [roms, currentPlatform, hasPlatformFolder]);
 
-    const checkRomFolders = async () => {
-        if (roms.length > 0 && currentPlatform) {
-            console.log(`Checking ${roms.length} ROMs for platform ${currentPlatform.name}`);
-            const folder = await getPlatformFolder(currentPlatform.slug);
-            if (folder?.folderUri) {
-                console.log('Platform folder found, checking ROMs:', folder.folderUri);
-                await checkMultipleRoms(roms, folder.folderUri);
-                console.log('ROM check completed');
-            } else {
-                console.log('No platform folder configured for:', currentPlatform.slug);
-            }
-        }
-    };
-
-    const showFolderSelectionDialog = async () => {
-        if (!currentPlatform) return;
-
-        const hasFolder = await hasPlatformFolder(currentPlatform.slug);
-        const currentFolder = await getPlatformFolder(currentPlatform.slug);
-
-        Alert.alert(
-            hasFolder ? t('changeFolderTitle') : t('selectFolderTitle'),
-            hasFolder
-                ? `${t('currentFolder', { folderName: currentFolder?.folderName || '' })}\n\n${t('selectNewFolderQuestion', { platform: currentPlatform.name })}`
-                : t('selectFolderToDownload', { platform: currentPlatform.name }),
-            [
-                {
-                    text: hasFolder ? t('cancel') : t('notNow'),
-                    style: 'cancel'
-                },
-                {
-                    text: hasFolder ? t('changeFolder') : t('selectFolder'),
-                    onPress: async () => {
-                        try {
-                            const folderUri = await requestDirectoryPermissions();
-                            if (folderUri) {
-                                await savePlatformFolder(currentPlatform.slug, currentPlatform.name, folderUri);
-                                if (roms.length > 0) {
-                                    if (currentPlatform) {
-                                        const folder = await getPlatformFolder(currentPlatform.slug);
-                                        await checkMultipleRoms(roms, folder?.folderUri || '');
-                                    }
-                                }
-                                showSuccessToast(
-                                    t('folderConfiguredSuccessfully', { platform: currentPlatform.name }),
-                                    t('folderConfigured')
-                                );
-                            }
-                        } catch (error) {
-                            console.error('Error selecting folder:', error);
-                            showErrorToast(
-                                t('errorSelectingFolder'),
-                                t('error')
-                            );
-                        }
-                    }
-                }
-            ]
-        );
-    };
+    useEffect(() => {
+        Promise.all(roms.map(rom => refreshRomCheck(rom)))
+    }, [roms, ]);
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -191,16 +126,9 @@ export default function PlatformScreen() {
         }
 
         // Get the platform folder
-        const platformFolder = await getPlatformFolder(currentPlatform.slug);
+        const platformFolder = await searchPlatformFolder(currentPlatform);
         if (!platformFolder) {
-            Alert.alert(
-                t('folderNotSelected'),
-                t('selectFolderFirst', { platform: currentPlatform.name }),
-                [
-                    { text: t('cancel'), style: 'cancel' },
-                    { text: t('selectFolder'), onPress: () => showFolderSelectionDialog() }
-                ]
-            );
+            await requestPlatformFolder(currentPlatform);
             return;
         }
 
@@ -258,16 +186,9 @@ export default function PlatformScreen() {
         if (!currentPlatform) return;
 
         // Get the platform folder
-        const platformFolder = await getPlatformFolder(currentPlatform.slug);
+        const platformFolder = await searchPlatformFolder(currentPlatform);
         if (!platformFolder) {
-            Alert.alert(
-                t('folderNotSelected'),
-                t('selectFolderForDownload', { platform: currentPlatform.name }),
-                [
-                    { text: t('cancel'), style: 'cancel' },
-                    { text: t('selectFolder'), onPress: () => showFolderSelectionDialog() }
-                ]
-            );
+            await requestPlatformFolder(currentPlatform);
             return;
         }
 
@@ -386,7 +307,7 @@ export default function PlatformScreen() {
                     <View style={styles.headerButtons}>
                         <TouchableOpacity
                             style={styles.folderButton}
-                            onPress={() => showFolderSelectionDialog()}
+                            onPress={() => requestPlatformFolder(currentPlatform, true)}
                         >
                             <Ionicons name="folder-outline" size={20} color="#fff" />
                         </TouchableOpacity>

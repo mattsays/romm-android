@@ -166,5 +166,17 @@
     "languageDescription": "Escolha seu idioma preferido para a interface da aplicação",
     "languageChanged": "Idioma alterado com sucesso",
     "permissionsNotGranted": "Permissões não concedidas",
-    "permissionsNotGrantedMessage": "Você não concedeu permissões para acessar a pasta. Tente novamente."
+    "permissionsNotGrantedMessage": "Você não concedeu permissões para acessar a pasta. Tente novamente.",
+    "baseFolderRequired": "Pasta Base Necessária",
+    "baseFolderRequiredMessage": "Para usar este app, você precisa configurar uma pasta base onde as ROMs serão armazenadas. Esta pasta será usada para organizar as ROMs por plataforma.",
+    "selectBaseFolder": "Selecionar Pasta Base",
+    "baseFolderConfigured": "Pasta base configurada com sucesso!",
+    "createFolder": "Criar Pasta",
+    "errorCreatingFolder": "Erro ao criar pasta",
+    "folderSelectionFailed": "Falha na seleção da pasta para a plataforma {{platform}}. Tente novamente.",
+    "baseFolder": "Pasta Base",
+    "baseFolderDescription": "Configure a pasta principal onde todas as ROMs serão organizadas por plataforma",
+    "confirmRemoveBaseFolder": "Tem certeza de que deseja remover a pasta base?",
+    "baseFolderRemoved": "Pasta base removida com sucesso",
+    "errorRemovingBaseFolder": "Erro ao remover pasta base"
 }

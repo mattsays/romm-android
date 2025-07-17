@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Alert,
     ScrollView,
@@ -23,8 +23,12 @@ export default function SettingsScreen() {
         removePlatformFolder,
         removeAllPlatformFolders,
         loadPlatformFolders,
-        platformFolders
+        platformFolders,
+        setBaseFolder,
+        getBaseFolder,
+        removeBaseFolder
     } = usePlatformFolders();
+    const [baseFolder, setBaseFolderState] = useState<string | null>(null);
 
     const changePlatformFolder = async (platformSlug: string, platformName: string) => {
         try {
@@ -98,9 +102,84 @@ export default function SettingsScreen() {
         );
     };
 
+    const changeBaseFolder = async () => {
+        try {
+            const folderUri = await requestDirectoryPermissions();
+
+            if (folderUri) {
+                await setBaseFolder(folderUri);
+                setBaseFolderState(folderUri);
+
+                showSuccessToast(
+                    t('baseFolderConfigured'),
+                    t('success')
+                );
+            }
+        } catch (error: any) {
+            console.error('Error selecting base folder:', error);
+
+            if (error.type === 'permissions_denied') {
+                showErrorToast(
+                    error.message,
+                    t('permissionsNotGranted')
+                );
+            } else {
+                showErrorToast(
+                    error.message || t('errorSelectingFolder'),
+                    t('error')
+                );
+            }
+        }
+    };
+
+    const handleRemoveBaseFolder = () => {
+        Alert.alert(
+            t('confirmRemoveFolder'),
+            t('confirmRemoveBaseFolder'),
+            [
+                {
+                    text: t('cancel'),
+                    style: 'cancel',
+                },
+                {
+                    text: t('remove'),
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await removeBaseFolder();
+                            setBaseFolderState(null);
+                            showSuccessToast(
+                                t('baseFolderRemoved'),
+                                t('success')
+                            );
+                        } catch (error) {
+                            console.error('Error removing base folder:', error);
+                            showErrorToast(
+                                t('errorRemovingBaseFolder'),
+                                t('error')
+                            );
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     useEffect(() => {
         // Load configured platforms when the component mounts
         loadPlatformFolders();
+
+        // Load base folder
+        const loadBaseFolder = async () => {
+            try {
+                const folder = await getBaseFolder();
+                setBaseFolderState(folder);
+            } catch (error) {
+                console.error('Error loading base folder:', error);
+            }
+        };
+
+        loadBaseFolder();
     }, []);
 
     return (
@@ -115,6 +194,46 @@ export default function SettingsScreen() {
                         <Ionicons name="arrow-back" size={24} color="#fff" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>{t('settings')}</Text>
+                </View>
+
+                {/* Base Folder Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>{t('baseFolder')}</Text>
+                    <Text style={styles.sectionDescription}>
+                        {t('baseFolderDescription')}
+                    </Text>
+
+                    {baseFolder ? (
+                        <View style={styles.folderInfo}>
+                            <View style={styles.folderPath}>
+                                <Ionicons name="folder" size={20} color="#4CAF50" />
+                                <View style={styles.folderTextContainer}>
+                                    <Text style={styles.platformNameText} numberOfLines={1}>
+                                        {t('baseFolder')}
+                                    </Text>
+                                    <Text style={styles.folderNameText} numberOfLines={2}>
+                                        {(baseFolder)}
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={styles.folderActions}>
+                                <TouchableOpacity
+                                    style={[styles.button, styles.changeButton]}
+                                    onPress={changeBaseFolder}
+                                >
+                                    <Text style={styles.buttonText}>{t('change')}</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ) : (
+                        <TouchableOpacity
+                            style={[styles.button, styles.selectButton]}
+                            onPress={changeBaseFolder}
+                        >
+                            <Ionicons name="folder-outline" size={20} color="#fff" />
+                            <Text style={styles.buttonText}>{t('selectBaseFolder')}</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 {/* Platform Folders Section */}
