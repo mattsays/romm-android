@@ -28,7 +28,7 @@ export default function PlatformScreen() {
     const { platform } = useLocalSearchParams();
     const navigation = useNavigation();
     const { t } = useTranslation();
-    const { roms, loading: romsLoading, error: romsError, fetchRomsByPlatform } = useRoms();
+    const { roms, loading: romsLoading, loadingMore, hasMore, total, error: romsError, fetchRomsByPlatform, loadMoreRoms } = useRoms();
     const { platform: currentPlatform, loading: platformLoading, error: platformError, fetchPlatform } = usePlatform();
     const { addToQueue, isDownloading, completedDownloads } = useDownload();
     const { requestPlatformFolder, searchPlatformFolder, hasPlatformFolder } = usePlatformFolders();
@@ -63,7 +63,7 @@ export default function PlatformScreen() {
     useEffect(() => {
         console.log('Fetching ROMs for platform ID:', platformId);
         fetchRomsByPlatform(platformId);
-    }, [platformId, fetchRomsByPlatform]);
+    }, [platformId]);
 
     // Monitor completed downloads to refresh ROM status
     useEffect(() => {
@@ -86,7 +86,7 @@ export default function PlatformScreen() {
 
     useEffect(() => {
         Promise.all(roms.map(rom => refreshRomCheck(rom)))
-    }, [roms, ]);
+    }, [roms.length]);
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -293,6 +293,26 @@ export default function PlatformScreen() {
         return paddedData;
     };
 
+    // Footer component for loading more items
+    const renderFooter = () => {
+        if (!loadingMore) return null;
+
+        return (
+            <View style={styles.loadingFooter}>
+                <ActivityIndicator size="small" color="#007AFF" />
+                <Text style={styles.loadingFooterText}>{t('loadingMore')}</Text>
+            </View>
+        );
+    };
+
+    // Handle end reached for infinite scroll
+    const handleEndReached = () => {
+        if (hasMore && !loadingMore && !romsLoading) {
+            console.log('Loading more ROMs for platform...');
+            loadMoreRoms();
+        }
+    };
+
     return (
         <View style={styles.container}>
             {/* Header Section */}
@@ -303,6 +323,9 @@ export default function PlatformScreen() {
                     </TouchableOpacity>
                     <View style={styles.headerLeft}>
                         <Text style={styles.headerTitle}>{currentPlatform?.name || t('unknownPlatform')}</Text>
+                        <Text style={styles.headerSubtitle}>
+                            {total !== null ? `${roms.length}/${total}` : roms.length} {t('games')}
+                        </Text>
                     </View>
                     <View style={styles.headerButtons}>
                         <TouchableOpacity
@@ -361,6 +384,9 @@ export default function PlatformScreen() {
                         </View>
                     ) : null
                 }
+                ListFooterComponent={renderFooter}
+                onEndReached={handleEndReached}
+                onEndReachedThreshold={0.1}
             />
 
             <DownloadStatusBar onPress={() => router.push('/downloads')} />
@@ -413,6 +439,11 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 32,
         fontWeight: 'bold',
+    },
+    headerSubtitle: {
+        color: '#999',
+        fontSize: 14,
+        marginTop: 2,
     },
     downloadAllButton: {
         flexDirection: 'row',
@@ -655,5 +686,16 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    loadingFooter: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 20,
+        gap: 10,
+    },
+    loadingFooterText: {
+        color: '#999',
+        fontSize: 14,
     },
 });

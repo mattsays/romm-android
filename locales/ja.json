@@ -178,5 +178,6 @@
     "baseFolderDescription": "すべてのROMがプラットフォーム別に整理されるメインフォルダを設定します",
     "confirmRemoveBaseFolder": "ベースフォルダを削除してもよろしいですか？",
     "baseFolderRemoved": "ベースフォルダが正常に削除されました",
-    "errorRemovingBaseFolder": "ベースフォルダの削除エラー"
+    "errorRemovingBaseFolder": "ベースフォルダの削除エラー",
+    "loadingMore": "さらに読み込み中..."
 }

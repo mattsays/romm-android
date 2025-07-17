@@ -178,5 +178,6 @@
     "baseFolderDescription": "Configureer de hoofdmap waar alle ROMs per platform worden georganiseerd",
     "confirmRemoveBaseFolder": "Weet je zeker dat je de basismap wilt verwijderen?",
     "baseFolderRemoved": "Basismap succesvol verwijderd",
-    "errorRemovingBaseFolder": "Fout bij het verwijderen van basismap"
+    "errorRemovingBaseFolder": "Fout bij het verwijderen van basismap",
+    "loadingMore": "Meer laden..."
 }

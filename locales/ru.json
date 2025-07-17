@@ -178,5 +178,6 @@
     "baseFolderDescription": "Настройте основную папку, где все ROM будут организованы по платформам",
     "confirmRemoveBaseFolder": "Вы уверены, что хотите удалить базовую папку?",
     "baseFolderRemoved": "Базовая папка успешно удалена",
-    "errorRemovingBaseFolder": "Ошибка удаления базовой папки"
+    "errorRemovingBaseFolder": "Ошибка удаления базовой папки",
+    "loadingMore": "Загрузка ещё..."
 }

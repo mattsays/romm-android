@@ -178,5 +178,6 @@
     "baseFolderDescription": "Configure the main folder where all ROMs will be organized by platform",
     "confirmRemoveBaseFolder": "Are you sure you want to remove the base folder?",
     "baseFolderRemoved": "Base folder removed successfully",
-    "errorRemovingBaseFolder": "Error removing base folder"
+    "errorRemovingBaseFolder": "Error removing base folder",
+    "loadingMore": "Loading more..."
 }

@@ -178,5 +178,6 @@
     "baseFolderDescription": "Konfigurieren Sie den Hauptordner, in dem alle ROMs nach Plattformen organisiert werden",
     "confirmRemoveBaseFolder": "Sind Sie sicher, dass Sie den Basis-Ordner entfernen möchten?",
     "baseFolderRemoved": "Basis-Ordner erfolgreich entfernt",
-    "errorRemovingBaseFolder": "Fehler beim Entfernen des Basis-Ordners"
+    "errorRemovingBaseFolder": "Fehler beim Entfernen des Basis-Ordners",
+    "loadingMore": "Mehr laden..."
 }

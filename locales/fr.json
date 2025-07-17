@@ -178,5 +178,6 @@
     "baseFolderDescription": "Configurez le dossier principal où toutes les ROMs seront organisées par plateforme",
     "confirmRemoveBaseFolder": "Êtes-vous sûr de vouloir supprimer le dossier de base?",
     "baseFolderRemoved": "Dossier de base supprimé avec succès",
-    "errorRemovingBaseFolder": "Erreur lors de la suppression du dossier de base"
+    "errorRemovingBaseFolder": "Erreur lors de la suppression du dossier de base",
+    "loadingMore": "Chargement en cours..."
 }

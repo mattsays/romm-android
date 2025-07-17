@@ -33,7 +33,7 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
     const collectionId = id;
     const isVirtual = virtual === 'true';
     const { t } = useTranslation();
-    const { roms, loading, error, fetchRoms } = useRomsByCollection(collectionId, isVirtual);
+    const { roms, loading, error, fetchRoms, loadMoreRoms, loadingMore, hasMore, total } = useRomsByCollection(collectionId, isVirtual);
     const [collection, setCollection] = useState<ApiCollection | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [isDownloadingAll, setIsDownloadingAll] = useState(false);
@@ -137,7 +137,7 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
         }
 
         // Get all unique platforms from the collection's ROMs
-        const uniquePlatforms = [...new Set(roms.map(rom => ({name: rom.platform_name, slug: rom.platform_slug } as Platform)))];
+        const uniquePlatforms = [...new Set(roms.map(rom => ({ name: rom.platform_name, slug: rom.platform_slug } as Platform)))];
 
         // Check if all platforms have configured folders
         const missingFolders: string[] = [];
@@ -291,6 +291,26 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
         return paddedData;
     };
 
+    // Footer component for loading more items
+    const renderFooter = () => {
+        if (!loadingMore) return null;
+
+        return (
+            <View style={styles.loadingFooter}>
+                <ActivityIndicator size="small" color="#5f43b2" />
+                <Text style={styles.loadingFooterText}>{t('loadingMore')}</Text>
+            </View>
+        );
+    };
+
+    // Handle end reached for infinite scroll
+    const handleEndReached = () => {
+        if (hasMore && !loadingMore && !loading) {
+            console.log('Loading more ROMs...');
+            loadMoreRoms();
+        }
+    };
+
     // Calculate available ROMs to download
     const availableToDownload = roms.filter(rom => !isDownloading(rom.id) && !isRomDownloaded(rom.id)).length;
 
@@ -311,7 +331,7 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
                                 {collection?.name || t('collection')}
                             </Text>
                             <Text style={styles.headerSubtitle}>
-                                {roms.length} {t('games')}
+                                {total !== null ? `${roms.length}/${total}` : roms.length} {t('games')}
                             </Text>
                         </View>
                         <View style={styles.headerButtons}>
@@ -371,6 +391,9 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
                             </View>
                         ) : null
                     }
+                    ListFooterComponent={renderFooter}
+                    onEndReached={handleEndReached}
+                    onEndReachedThreshold={0.1}
                     contentInsetAdjustmentBehavior="automatic"
                 />
 
@@ -568,5 +591,16 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         minWidth: 16,
         textAlign: 'center',
+    },
+    loadingFooter: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 20,
+        gap: 10,
+    },
+    loadingFooterText: {
+        color: '#999',
+        fontSize: 14,
     },
 });

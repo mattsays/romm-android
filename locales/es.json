@@ -178,5 +178,6 @@
     "baseFolderDescription": "Configura la carpeta principal donde se organizarán todas las ROMs por plataforma",
     "confirmRemoveBaseFolder": "¿Estás seguro de que quieres eliminar la carpeta base?",
     "baseFolderRemoved": "Carpeta base eliminada exitosamente",
-    "errorRemovingBaseFolder": "Error al eliminar la carpeta base"
+    "errorRemovingBaseFolder": "Error al eliminar la carpeta base",
+    "loadingMore": "Cargando más..."
 }

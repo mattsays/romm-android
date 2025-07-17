@@ -295,14 +295,12 @@ class ApiClient {
         return this.request<Collection>(`/api/collections/${collectionId}`);
     }
 
-    async getRomsByCollection(collectionId: string, isVirtual: boolean, limit: number = 10, offset: number = 0): Promise<Rom[]> {
+    async getRomsByCollection(collectionId: string, isVirtual: boolean, limit: number = 10, offset: number = 0): Promise<ItemsResponse<Rom>> {
         if (isVirtual) {
-            const response = await this.request<ItemsResponse<Rom>>(`/api/roms?virtual_collection_id=${collectionId}&limit=${limit}&offset=${offset}`);
-            return response.items;
+            return this.request<ItemsResponse<Rom>>(`/api/roms?virtual_collection_id=${collectionId}&limit=${limit}&offset=${offset}`);
         }
 
-        const response = await this.request<ItemsResponse<Rom>>(`/api/roms?collection_id=${collectionId}&limit=${limit}&offset=${offset}`);
-        return response.items;
+        return this.request<ItemsResponse<Rom>>(`/api/roms?collection_id=${collectionId}&limit=${limit}&offset=${offset}`);
     }
 
     async getRomsRecentlyAdded(): Promise<Rom[]> {
@@ -310,9 +308,8 @@ class ApiClient {
         return response.items;
     }
 
-    async getRomsByPlatform(platformId: number): Promise<Rom[]> {
-        const response = await this.request<ItemsResponse<Rom>>(`/api/roms?platform_id=${platformId}`);
-        return response.items;
+    async getRomsByPlatform(platformId: number, limit: number = 20, offset: number = 0): Promise<ItemsResponse<Rom>> {
+        return this.request<ItemsResponse<Rom>>(`/api/roms?platform_id=${platformId}&limit=${limit}&offset=${offset}`);
     }
 
     async getRomById(romId: number): Promise<Rom> {
