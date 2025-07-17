@@ -404,7 +404,7 @@ export function useRomsSearch(): UseRomsSearchReturn {
     const [currentOrderDir, setCurrentOrderDir] = useState<string>('asc');
     const [offset, setOffset] = useState(0);
 
-    const ITEMS_PER_PAGE = 50;
+    const ITEMS_PER_PAGE = 10;
 
     const searchRoms = useCallback(async (
         query: string,
@@ -452,7 +452,7 @@ export function useRomsSearch(): UseRomsSearchReturn {
                 offset: currentOffset
             });
 
-            const newItems = response || [];
+            const newItems = response.items || [];
             const newRoms = reset ? newItems : [...state.roms, ...newItems];
 
             setState(prev => ({
@@ -460,7 +460,7 @@ export function useRomsSearch(): UseRomsSearchReturn {
                 roms: newRoms,
                 loading: false,
                 loadingMore: false,
-                total: newItems.length < ITEMS_PER_PAGE ? newRoms.length : null, // Estimate since API doesn't return total
+                total: response.total || 0, 
                 hasMore: newItems.length === ITEMS_PER_PAGE,
                 searchPerformed: true
             }));

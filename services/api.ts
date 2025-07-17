@@ -342,10 +342,10 @@ class ApiClient {
         return headers;
     }
 
-    async searchRoms(query: string, options: SearchOptions = {}): Promise<Rom[]> {
+    async searchRoms(query: string, options: SearchOptions = {}): Promise<ItemsResponse<Rom>> {
         const response = await this.request<ItemsResponse<Rom>>(
             `/api/roms?search_term=${encodeURIComponent(query)}&order_by=${options.order_by || 'name'}&order_dir=${options.order_dir || 'asc'}&limit=${options.limit || 20}&offset=${options.offset || 0}`);
-        return response.items;
+        return response;
     }
 
     // Authentication methods

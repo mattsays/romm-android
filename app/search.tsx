@@ -41,7 +41,7 @@ export default function SearchScreen() {
     const [sortDirection, setSortDirection] = useState<SearchOrderDirection>('asc');
     const { showErrorToast, showInfoToast } = useToast();
     const { downloadRom } = useRomDownload();
-    const { isDownloading } = useDownload();
+    const { completedDownloads, isDownloading } = useDownload();
     const { isRomDownloaded, isCheckingRom, refreshRomCheck } = useRomFileSystem();
     const { columns, cardWidth, isLandscape } = useDynamicColumns();
     const {
@@ -75,14 +75,14 @@ export default function SearchScreen() {
         if (searchQuery.trim()) {
             performSearch(searchQuery, sortBy, sortDirection);
         }
-    }, [searchQuery, sortBy, sortDirection, performSearch]);
+    }, [searchQuery, sortBy, sortDirection]);
 
     // Monitor search results to refresh ROM status
     useEffect(() => {
         if (searchResults.length > 0) {
             Promise.all(searchResults.map(rom => refreshRomCheck(rom)));
         }
-    }, [searchResults.length, refreshRomCheck]);
+    }, [searchResults.length, completedDownloads.length]);
 
     // Show error if search fails
     useEffect(() => {
@@ -319,7 +319,7 @@ export default function SearchScreen() {
     return (
         <ProtectedRoute>
             <View style={[styles.container, { paddingTop: insets.top }]}>
-                {/* Header */}
+                {/* Header with integrated search bar */}
                 <View style={styles.header}>
                     <TouchableOpacity
                         style={styles.backButton}
@@ -327,14 +327,8 @@ export default function SearchScreen() {
                     >
                         <Ionicons name="arrow-back" size={24} color="#fff" />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>{t('searchRoms')}</Text>
-                    <View style={styles.headerSpacer} />
-                </View>
-
-                {/* Search Bar */}
-                <View style={styles.searchContainer}>
                     <View style={styles.searchInputContainer}>
-                        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+                        <Ionicons name="search" size={18} color="#666" style={styles.searchIcon} />
                         <TextInput
                             style={styles.searchInput}
                             placeholder={t('searchPlaceholder')}
@@ -350,7 +344,7 @@ export default function SearchScreen() {
                                 style={styles.clearButton}
                                 onPress={clearSearch}
                             >
-                                <Ionicons name="close-circle" size={20} color="#666" />
+                                <Ionicons name="close-circle" size={18} color="#666" />
                             </TouchableOpacity>
                         )}
                     </View>
@@ -424,7 +418,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingVertical: 16,
+        paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#333',
     },
@@ -455,7 +449,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#111',
         borderRadius: 12,
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: 2,
         borderWidth: 1,
         borderColor: '#333',
     },
@@ -472,8 +466,9 @@ const styles = StyleSheet.create({
     },
     sortButton: {
         backgroundColor: '#5f43b2',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        marginLeft: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
@@ -481,6 +476,7 @@ const styles = StyleSheet.create({
     resultsContainer: {
         flex: 1,
         paddingHorizontal: 20,
+        paddingTop: 10,
     },
     loadingContainer: {
         flex: 1,
