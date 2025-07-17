@@ -179,5 +179,20 @@
     "confirmRemoveBaseFolder": "Êtes-vous sûr de vouloir supprimer le dossier de base?",
     "baseFolderRemoved": "Dossier de base supprimé avec succès",
     "errorRemovingBaseFolder": "Erreur lors de la suppression du dossier de base",
-    "loadingMore": "Chargement en cours..."
+    "loadingMore": "Chargement en cours...",
+    "search": "Rechercher",
+    "searchRoms": "Rechercher des ROMs",
+    "searchPlaceholder": "Rechercher des jeux...",
+    "sortBy": "Trier par",
+    "sortByName": "Nom",
+    "sortBySize": "Taille",
+    "sortByDateAdded": "Date d'ajout",
+    "sortByReleaseDate": "Date de sortie",
+    "sortByRating": "Note",
+    "sortAscending": "Croissant",
+    "sortDescending": "Décroissant",
+    "noSearchResults": "Aucun résultat trouvé",
+    "searchResultsFor": "Résultats pour \"{{query}}\"",
+    "clearSearch": "Effacer la recherche",
+    "searchEmptyState": "Commencez à taper pour rechercher vos ROMs préférées"
 }

@@ -104,6 +104,16 @@ export interface Rom {
     ra_id?: number;
 }
 
+export type SearchOrderCriteria = 'name' | 'fs_size_bytes' | 'created_at' | 'first_release_date' | 'average_rating';
+export type SearchOrderDirection = 'asc' | 'desc';
+
+export interface SearchOptions {
+    order_by?: SearchOrderCriteria;
+    order_dir?: SearchOrderDirection;
+    limit?: number;
+    offset?: number;
+}
+
 export interface ApiResponse<T> {
     data: T;
     success: boolean;
@@ -332,8 +342,9 @@ class ApiClient {
         return headers;
     }
 
-    async searchRoms(query: string): Promise<Rom[]> {
-        const response = await this.request<ItemsResponse<Rom>>(`/api/roms?search_term=${encodeURIComponent(query)}`);
+    async searchRoms(query: string, options: SearchOptions = {}): Promise<Rom[]> {
+        const response = await this.request<ItemsResponse<Rom>>(
+            `/api/roms?search_term=${encodeURIComponent(query)}&order_by=${options.order_by || 'name'}&order_dir=${options.order_dir || 'asc'}&limit=${options.limit || 20}&offset=${options.offset || 0}`);
         return response.items;
     }
 

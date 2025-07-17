@@ -179,5 +179,20 @@
     "confirmRemoveBaseFolder": "Sind Sie sicher, dass Sie den Basis-Ordner entfernen möchten?",
     "baseFolderRemoved": "Basis-Ordner erfolgreich entfernt",
     "errorRemovingBaseFolder": "Fehler beim Entfernen des Basis-Ordners",
-    "loadingMore": "Mehr laden..."
+    "loadingMore": "Mehr laden...",
+    "search": "Suchen",
+    "searchRoms": "ROMs suchen",
+    "searchPlaceholder": "Spiele suchen...",
+    "sortBy": "Sortieren nach",
+    "sortByName": "Name",
+    "sortBySize": "Größe",
+    "sortByDateAdded": "Hinzufügungsdatum",
+    "sortByReleaseDate": "Veröffentlichungsdatum",
+    "sortByRating": "Bewertung",
+    "sortAscending": "Aufsteigend",
+    "sortDescending": "Absteigend",
+    "noSearchResults": "Keine Ergebnisse gefunden",
+    "searchResultsFor": "Ergebnisse für \"{{query}}\"",
+    "clearSearch": "Suche löschen",
+    "searchEmptyState": "Beginnen Sie mit der Eingabe, um Ihre Lieblings-ROMs zu suchen"
 }

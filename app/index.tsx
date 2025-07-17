@@ -338,6 +338,12 @@ export default function LibraryScreen() {
                             </View>
                             <View style={styles.headerButtons}>
                                 <TouchableOpacity
+                                    style={styles.headerButton}
+                                    onPress={() => router.push('/search')}
+                                >
+                                    <Ionicons name="search-outline" size={24} color="#fff" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
                                     style={[styles.headerButton, activeDownloads.length > 0 && styles.downloadButtonActive]}
                                     onPress={() => router.push('/downloads')}
                                 >

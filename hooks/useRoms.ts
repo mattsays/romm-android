@@ -370,3 +370,162 @@ export function useRomsByCollection(collectionId: string, isVirtual: boolean, au
         loadMoreRoms,
     };
 }
+
+// Hook for searching ROMs with infinite scrolling
+interface UseRomsSearchState {
+    roms: Rom[];
+    loading: boolean;
+    loadingMore: boolean;
+    error: string | null;
+    hasMore: boolean;
+    total: number | null;
+    searchPerformed: boolean;
+}
+
+interface UseRomsSearchReturn extends UseRomsSearchState {
+    searchRoms: (query: string, orderBy?: string, orderDir?: string, reset?: boolean) => Promise<void>;
+    loadMoreRoms: () => Promise<void>;
+    clearSearch: () => void;
+}
+
+export function useRomsSearch(): UseRomsSearchReturn {
+    const [state, setState] = useState<UseRomsSearchState>({
+        roms: [],
+        loading: false,
+        loadingMore: false,
+        error: null,
+        hasMore: true,
+        total: null,
+        searchPerformed: false,
+    });
+
+    const [currentQuery, setCurrentQuery] = useState<string>('');
+    const [currentOrderBy, setCurrentOrderBy] = useState<string>('name');
+    const [currentOrderDir, setCurrentOrderDir] = useState<string>('asc');
+    const [offset, setOffset] = useState(0);
+
+    const ITEMS_PER_PAGE = 50;
+
+    const searchRoms = useCallback(async (
+        query: string,
+        orderBy: string = 'name',
+        orderDir: string = 'asc',
+        reset: boolean = true
+    ) => {
+        if (!query.trim()) {
+            setState(prev => ({
+                ...prev,
+                roms: [],
+                searchPerformed: false,
+                hasMore: true,
+                total: null,
+                error: null
+            }));
+            return;
+        }
+
+        try {
+            const currentOffset = reset ? 0 : offset;
+
+            if (reset) {
+                setState(prev => ({ 
+                    ...prev, 
+                    loading: true, 
+                    error: null, 
+                    roms: [], 
+                    hasMore: true, 
+                    total: null,
+                    searchPerformed: true
+                }));
+                setOffset(0);
+                setCurrentQuery(query);
+                setCurrentOrderBy(orderBy);
+                setCurrentOrderDir(orderDir);
+            } else {
+                setState(prev => ({ ...prev, loadingMore: true }));
+            }
+
+            const response = await apiClient.searchRoms(query, {
+                order_by: orderBy as any,
+                order_dir: orderDir as any,
+                limit: ITEMS_PER_PAGE,
+                offset: currentOffset
+            });
+
+            const newItems = response || [];
+            const newRoms = reset ? newItems : [...state.roms, ...newItems];
+
+            setState(prev => ({
+                ...prev,
+                roms: newRoms,
+                loading: false,
+                loadingMore: false,
+                total: newItems.length < ITEMS_PER_PAGE ? newRoms.length : null, // Estimate since API doesn't return total
+                hasMore: newItems.length === ITEMS_PER_PAGE,
+                searchPerformed: true
+            }));
+
+            setOffset(reset ? newItems.length : offset + newItems.length);
+
+            console.log(`Search loaded ${newItems.length} ROMs for "${query}", total loaded: ${reset ? newItems.length : state.roms.length + newItems.length}`);
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to search ROMs';
+            setState(prev => ({
+                ...prev,
+                loading: false,
+                loadingMore: false,
+                error: errorMessage,
+                searchPerformed: true
+            }));
+            console.error('Error searching ROMs:', error);
+        }
+    }, [offset, state.roms.length, apiClient]);
+
+    const loadMoreRoms = useCallback(async () => {
+        if (currentQuery && state.hasMore && !state.loadingMore && !state.loading) {
+            console.log('Loading more search results, current offset:', offset);
+            await searchRoms(currentQuery, currentOrderBy, currentOrderDir, false);
+        }
+    }, [currentQuery, currentOrderBy, currentOrderDir, state.hasMore, state.loadingMore, state.loading, offset, searchRoms]);
+
+    const clearSearch = useCallback(() => {
+        setState({
+            roms: [],
+            loading: false,
+            loadingMore: false,
+            error: null,
+            hasMore: true,
+            total: null,
+            searchPerformed: false,
+        });
+        setCurrentQuery('');
+        setCurrentOrderBy('name');
+        setCurrentOrderDir('asc');
+        setOffset(0);
+    }, []);
+
+    // Reset state when search parameters change
+    useEffect(() => {
+        return () => {
+            setState(prev => ({
+                ...prev,
+                roms: [],
+                loading: false,
+                loadingMore: false,
+                error: null,
+                hasMore: true,
+                total: null,
+            }));
+            setOffset(0);
+        };
+    }, [currentQuery, currentOrderBy, currentOrderDir]);
+
+    return {
+        ...state,
+        searchRoms: (query: string, orderBy?: string, orderDir?: string) => 
+            searchRoms(query, orderBy, orderDir, true),
+        loadMoreRoms,
+        clearSearch,
+    };
+}
