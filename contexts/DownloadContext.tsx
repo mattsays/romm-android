@@ -1,16 +1,21 @@
 import * as FileSystem from 'expo-file-system';
-import { openDocumentTree, mkdir, createFile, moveFile } from "@joplin/react-native-saf-x";
+import { openDocumentTree, mkdir, createFile, moveFile, unlink, stat, listFiles, exists } from "@joplin/react-native-saf-x";
+import { unzip, subscribe } from 'react-native-zip-archive';
+import { listZipContents } from 'react-native-zip-stream';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { PlatformFolder } from '../hooks/usePlatformFolders';
 import { useRomFileSystem } from '../hooks/useRomFileSystem';
-import { apiClient, Rom } from '../services/api';
+import { apiClient, Rom, RomFile } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define the types here to avoid import issues
 export enum DownloadStatus {
     PENDING = 'pending',
     DOWNLOADING = 'downloading',
     PAUSED = 'paused',
+    EXTRACTING = 'extracting',
+    MOVING = 'moving',
     COMPLETED = 'completed',
     FAILED = 'failed',
     CANCELLED = 'cancelled',
@@ -19,6 +24,8 @@ export enum DownloadStatus {
 export interface DownloadItem {
     id: string;
     rom: Rom;
+    romName: string;
+    romFile: RomFile;
     platformFolder: PlatformFolder;
     status: DownloadStatus;
     progress: number;
@@ -37,9 +44,9 @@ interface DownloadContextType {
     activeDownloads: DownloadItem[];
     completedDownloads: DownloadItem[];
     failedDownloads: DownloadItem[];
-    isDownloading: (romId: number) => boolean;
+    isRomDownloading: (romFile: RomFile) => boolean;
     getDownloadById: (id: string) => DownloadItem | undefined;
-    addToQueue: (rom: Rom, platformFolder: PlatformFolder) => string;
+    addRomToQueue: (rom: Rom, romFile: RomFile, platformFolder: PlatformFolder) => string;
     removeFromQueue: (downloadId: string) => void;
     retryDownload: (downloadId: string) => void;
     clearCompleted: () => void;
@@ -68,11 +75,25 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
     const [downloadQueue, setDownloadQueue] = useState<string[]>([]);
     const [activeDownloads, setActiveDownloads] = useState<Set<string>>(new Set());
     const { refreshRomCheck } = useRomFileSystem();
-    const maxConcurrentDownloads = 2;
+
+    const getConcurrentDownloadsLimit = async (): Promise<number> => {
+        try {
+            const value = await AsyncStorage.getItem('concurrentDownloads');
+            if (value !== null) {
+                const numValue = parseInt(value, 10);
+                return (numValue >= 1 && numValue <= 5) ? numValue : 2;
+            }
+            return 2; // Default
+        } catch (error) {
+            return 2; // Fallback
+        }
+    };
 
     // Process download queue
     useEffect(() => {
         const processQueue = async () => {
+            console.log('Processing download queue:', downloadQueue);
+            const maxConcurrentDownloads = await getConcurrentDownloadsLimit();
             if (downloadQueue.length > 0 && activeDownloads.size < maxConcurrentDownloads) {
                 const downloadId = downloadQueue[0];
                 const download = downloads.find(d => d.id === downloadId);
@@ -86,7 +107,7 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
         };
 
         processQueue();
-    }, [downloadQueue, activeDownloads.size, downloads]);
+    }, [downloadQueue, activeDownloads, downloads.length]);
 
     const generateDownloadId = (): string => {
         return `download_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -109,10 +130,9 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
             });
 
             // Get the download URL from the API
-            const downloadUrl = await apiClient.obtainDownloadLink(download.rom);
-            const fileName = download.rom.fs_name;
-            const tempFilePath = FileSystem.cacheDirectory + fileName;
-
+            const downloadUrl = await apiClient.obtainDownloadLink(download.romFile);
+            const tempFilePath = FileSystem.cacheDirectory + download.romFile.file_name;
+            console.log(`Starting download for ROM: ${download.romName}, File path: ${tempFilePath}`);
             // Initialize speed tracking
             let lastProgressTime = Date.now();
             let lastDownloadedBytes = 0;
@@ -120,7 +140,7 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
             let currentSpeed = 0; // Keep track of current speed
             let currentRemainingTime = 0; // Keep track of current remaining time
             const maxSpeedHistoryLength = 5; // Keep last 5 speed measurements for smoothing
-            const minTimeForSpeedCalculation = 1.0; // Minimum time in seconds for speed calculation
+            const minTimeForSpeedCalculation = 3.0; // Minimum time in seconds for speed calculation
 
             // Create download resumable
             const downloadResumable = FileSystem.createDownloadResumable(
@@ -130,9 +150,7 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
                     headers: apiClient.getAuthHeaders(),
                 },
                 (downloadProgress) => {
-                    const progress = Math.round(
-                        (downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite) * 100
-                    );
+                    
 
                     // Calculate speed only when enough time has passed
                     const currentTime = Date.now();
@@ -158,6 +176,10 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
                         lastProgressTime = currentTime;
                         lastDownloadedBytes = downloadProgress.totalBytesWritten;
 
+                        const progress = Math.round(
+                            (downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite) * 100
+                        );
+
                         updateDownload(downloadId, {
                             progress,
                             downloadedBytes: downloadProgress.totalBytesWritten,
@@ -175,15 +197,15 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
                 downloadResumable,
             });
 
-            await downloadResumable.downloadAsync().then(async (result) => {
-                if (result) {
-                    if (result.status === 200) {
-                        await completeDownload(downloadId, tempFilePath, download);
-                    } else {
-                        throw new Error(`Download failed with status ${result?.status || 'unknown'}`);
-                    }
+            const res = await downloadResumable.downloadAsync();
+
+            if (res) {
+                if (res.status === 200) {
+                    await completeDownload(downloadId, tempFilePath, download);
+                } else {
+                    throw new Error(`Download failed with status ${res?.status || 'unknown'}`);
                 }
-            });
+            }
         } catch (error) {
             console.error('Download error:', error);
             updateDownload(downloadId, {
@@ -203,12 +225,111 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
     const completeDownload = async (downloadId: string, tempFilePath: string, download: DownloadItem): Promise<void> => {
         try {
 
-            // Seems to give an error despite actually moving the file correctly, just ignore the error
-            try {
-                await moveFile(tempFilePath, download.platformFolder.folderUri + '/' + download.rom.fs_name);
-            } catch (_) {}
-            
 
+            const updateDownloadProgress = async (filePath: string, expectedFileSize: number) => {
+
+                const fileExists = await exists(filePath);
+
+                if(!fileExists) {
+                    setTimeout(() => { updateDownloadProgress(filePath, expectedFileSize) }, 100);
+                    return;
+                }
+
+                const fileStatus = await stat(filePath);
+
+                const newProgress = Math.round((fileStatus.size / expectedFileSize) * 100);
+                updateDownload(downloadId, {
+                    status: DownloadStatus.MOVING,
+                    progress: newProgress,
+                    downloadedBytes: fileStatus.size,
+                    totalBytes: expectedFileSize,
+                    endTime: new Date(),
+                });
+
+                if(newProgress < 100) {
+                    setTimeout(() => { updateDownloadProgress(filePath, expectedFileSize) }, 1000); 
+                } else {
+                    updateDownload(downloadId, {
+                        status: DownloadStatus.COMPLETED,
+                        progress: 100,
+                        endTime: new Date(),
+                    })
+                }
+            };
+
+            const isZip = download.romFile.file_name.endsWith('.zip');
+            const value = await AsyncStorage.getItem('unzipFilesOnDownload');
+            const shouldUnzipFiles = value !== null ? JSON.parse(value) : true; // Default to true if not set
+            //const shouldUnzipFiles = true; // For now, always unzip files
+
+            if (isZip && shouldUnzipFiles) {
+                console.log(`Unzipping file: ${tempFilePath}`);
+                const unzipPath = FileSystem.cacheDirectory + `/${download.romFile.file_name.replace('.zip', '')}` || '';
+
+                updateDownload(downloadId, {
+                    status: DownloadStatus.EXTRACTING,
+                    progress: 0,
+                });
+
+                const zipProgressSubscription = subscribe(({ progress, filePath }) => {
+                    updateDownload(downloadId, {
+                        status: DownloadStatus.EXTRACTING,
+                        progress: Math.round(progress * 100),
+                        endTime: new Date(),
+                    });
+                })
+
+                const unzipedFile = await unzip(tempFilePath, unzipPath);
+                console.log(`Unzipped to: ${unzipedFile}`);
+
+                zipProgressSubscription.remove();
+
+                updateDownload(downloadId, {
+                    status: DownloadStatus.MOVING,
+                    progress: 0,
+                    endTime: new Date(),
+                });
+
+                // List files
+                const files = await ReactNativeBlobUtil.fs.ls(unzipPath);
+                console.log('Unzipped files to:', unzipPath);
+
+                // Remove the original zip file
+                await unlink(tempFilePath);
+            
+                // Move every file in the unzipped folder to the platform folder
+                for (const file of files) {
+                    const sourcePath = `${unzipPath}/${file}`;
+                    const destinationPath = `${download.platformFolder.folderUri}/${file}`;
+                    console.log(`Moving file from ${sourcePath} to ${destinationPath}`);
+                    try {
+                        const fileStatus = await stat(sourcePath);
+                        updateDownloadProgress(destinationPath, fileStatus.size);
+                        await moveFile(sourcePath, destinationPath, { replaceIfDestinationExists: true });
+                    } catch (_) {}
+                }
+
+                // Remove the unzipped folder
+                await unlink(unzipPath);
+
+            } else {
+                updateDownload(downloadId, {
+                    status: DownloadStatus.MOVING,
+                    progress: 0,
+                    endTime: new Date(),
+                });
+
+
+                // Seems to give an error despite actually moving the file correctly, just ignore the error
+                try {
+                    const sourcePath = download.platformFolder.folderUri + '/' + download.romFile.file_name;
+                    const fileStatus = await stat(tempFilePath);
+                    await updateDownloadProgress(sourcePath, fileStatus.size);
+                    await moveFile(tempFilePath, download.platformFolder.folderUri + '/' + download.romFile.file_name, { replaceIfDestinationExists: true });
+                } catch (_) {}
+            }
+
+            
             updateDownload(downloadId, {
                 status: DownloadStatus.COMPLETED,
                 progress: 100,
@@ -217,8 +338,8 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
 
             // Update the ROM file system cache to mark the ROM as downloaded
             try {
-                await refreshRomCheck(download.rom);
-                console.log(`ROM ${download.rom.name} marked as downloaded in filesystem cache`);
+                await refreshRomCheck(download.romFile, download.platformFolder);
+                console.log(`ROM ${download.romName} marked as downloaded in filesystem cache`);
             } catch (error) {
                 console.error('Error updating ROM filesystem cache:', error);
                 // Don't fail the download completion if cache update fails
@@ -236,7 +357,9 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
 
     const activeDownloadsList = downloads.filter(d =>
         d.status === DownloadStatus.DOWNLOADING ||
-        d.status === DownloadStatus.PENDING
+        d.status === DownloadStatus.PENDING ||
+        d.status === DownloadStatus.EXTRACTING ||
+        d.status === DownloadStatus.MOVING
     );
 
     const completedDownloads = downloads.filter(d =>
@@ -248,9 +371,9 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
         d.status === DownloadStatus.CANCELLED
     );
 
-    const isDownloading = (romId: number): boolean => {
+    const isRomDownloading = (romFile: RomFile): boolean => {
         return downloads.some(d =>
-            d.rom.id === romId &&
+            d.romFile.rom_id === romFile.rom_id &&
             (d.status === DownloadStatus.DOWNLOADING || d.status === DownloadStatus.PENDING)
         );
     };
@@ -259,10 +382,18 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
         return downloads.find(d => d.id === id);
     };
 
-    const addToQueue = (rom: Rom, platformFolder: PlatformFolder): string => {
+    const extractRomName = (romFile: RomFile): string => {
+        const fileName = romFile.file_name || '';
+        const nameWithoutExtension = fileName.replace(/\.[^/.]+$/, ''); // Remove file extension
+        const nameWithoutTags = nameWithoutExtension.replace(/(\[.*?\]|\(.*?\))/g, '').trim(); // Remove tags in square brackets or parentheses
+        return nameWithoutTags;
+    };
+
+    const addRomToQueue = (rom: Rom, romFile: RomFile, platformFolder: PlatformFolder): string => {
+
         // Check if ROM is already in queue or downloading
         const existingDownload = downloads.find(d =>
-            d.rom.id === rom.id &&
+            d.romFile.rom_id === romFile.rom_id &&
             (d.status === DownloadStatus.PENDING ||
                 d.status === DownloadStatus.DOWNLOADING ||
                 d.status === DownloadStatus.PAUSED)
@@ -275,12 +406,14 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
         const downloadId = generateDownloadId();
         const newDownload: DownloadItem = {
             id: downloadId,
-            rom,
+            rom: rom,
+            romName: extractRomName(romFile),
+            romFile,
             platformFolder,
             status: DownloadStatus.PENDING,
             progress: 0,
             downloadedBytes: 0,
-            totalBytes: rom.fs_size_bytes,
+            totalBytes: romFile.file_size_bytes,
             speed: 0,
             remainingTime: 0,
         };
@@ -359,7 +492,7 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
                 await download.downloadResumable.resumeAsync().then(async (result) => {
                     if (result) {
                         if (result.status === 200 || result.status === 206) {
-                            await completeDownload(downloadId, FileSystem.cacheDirectory + download.rom.fs_name, download);
+                            await completeDownload(downloadId, FileSystem.cacheDirectory + download.romFile.file_name, download);
                         } else {
                             console.log(`Download failed with status ${result?.status || 'unknown'}`);
                         }
@@ -379,7 +512,7 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
 
             // Clean up temp file if exists
             if (download.downloadResumable?.fileUri) {
-                FileSystem.deleteAsync(FileSystem.cacheDirectory + download.rom.fs_name, { idempotent: true });
+                FileSystem.deleteAsync(FileSystem.cacheDirectory + download.romFile.file_name, { idempotent: true });
             }
 
             updateDownload(downloadId, {
@@ -405,9 +538,9 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
                 activeDownloads: activeDownloadsList,
                 completedDownloads,
                 failedDownloads,
-                isDownloading,
+                isRomDownloading,
                 getDownloadById,
-                addToQueue,
+                addRomToQueue,
                 removeFromQueue,
                 retryDownload,
                 clearCompleted,

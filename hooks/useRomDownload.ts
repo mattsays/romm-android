@@ -2,11 +2,11 @@ import * as FileSystem from 'expo-file-system';
 import { useCallback } from 'react';
 import { Alert } from 'react-native';
 import { useDownload } from '../contexts/DownloadContext';
-import { Rom } from '../services/api';
+import { Rom, RomFile, RomSibling } from '../services/api';
 import { usePlatformFolders } from './usePlatformFolders';
 import { useRomFileSystem } from './useRomFileSystem';
 import { useTranslation } from './useTranslation';
-import { Platform } from '../services/api';
+import { Platform, apiClient } from '../services/api';
 
 export interface RomDownloadError extends Error {
     type: 'already_downloaded' | 'no_folder' | 'folder_selection_failed' | 'download_failed';
@@ -15,28 +15,31 @@ export interface RomDownloadError extends Error {
 }
 
 export const useRomDownload = () => {
-    const { addToQueue, isDownloading } = useDownload();
+    const { addRomToQueue, isRomDownloading } = useDownload();
     const { requestPlatformFolder, searchPlatformFolder, savePlatformFolder } = usePlatformFolders();
     const { checkIfRomExists, isRomDownloaded } = useRomFileSystem();
     const { t } = useTranslation();
 
-    const downloadRom = useCallback(async (rom: Rom): Promise<string | null> => {
+    const downloadRom = useCallback(async (rom: Rom, romFile: RomFile, platform: Platform): Promise<string | null> => {
         // First check if the ROM is already downloaded (from cache)
-        if (isRomDownloaded(rom.id)) {
-            const error = new Error(t('romAlreadyExists', { name: rom.name || rom.fs_name })) as RomDownloadError;
+
+        if (isRomDownloaded(romFile)) {
+            const error = new Error(t('romAlreadyExists', { name: romFile.file_name })) as RomDownloadError;
             error.type = 'already_downloaded';
-            error.romName = rom.name || rom.fs_name;
+            error.romName = romFile.file_name;
             throw error;
         }
 
-        let platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
+        console.log('Downloading ROM:', romFile.file_name);
+
+        let platformFolder = await searchPlatformFolder(platform);
 
         // If platform folder exists, do a real-time check for the file
         if (platformFolder) {
             try {
-                const exists = await checkIfRomExists(rom);
+                const exists = await checkIfRomExists(romFile, platformFolder);
                 if (exists) {
-                    console.warn('ROM already exists in the folder:', rom.fs_name);
+                    console.warn('ROM already exists in the folder:', romFile.file_name);
                     return null; // ROM already exists, no need to download
                 }
             } catch (error) {
@@ -45,13 +48,13 @@ export const useRomDownload = () => {
             }
         } else {
             // If the platform folder is not configured, prompt the user to select one
-            await requestPlatformFolder({name: rom.platform_name, slug: rom.platform_slug} as Platform);
-            platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
+            await requestPlatformFolder(platform);
+            platformFolder = await searchPlatformFolder(platform);
 
             if(!platformFolder) {
-                const error = new Error(t('folderSelectionFailed', { platform: rom.platform_name })) as RomDownloadError;
+                const error = new Error(t('folderSelectionFailed', { platform: platform.name })) as RomDownloadError;
                 error.type = 'folder_selection_failed';
-                error.platformName = rom.platform_name;
+                error.platformName = platform.name;
                 throw error;
             }
 
@@ -59,16 +62,16 @@ export const useRomDownload = () => {
 
         // Add to download queue
         console.log('Adding ROM to folder:', platformFolder);
-        const downloadId = addToQueue(rom, platformFolder);
+        const downloadId = addRomToQueue(rom, romFile, platformFolder);
         return downloadId;
-    }, [addToQueue, searchPlatformFolder, savePlatformFolder, checkIfRomExists, isRomDownloaded, t]);
+    }, [addRomToQueue, searchPlatformFolder, savePlatformFolder, checkIfRomExists, isRomDownloaded, t]);
 
-    const isRomDownloading = useCallback((romId: number): boolean => {
-        return isDownloading(romId);
-    }, [isDownloading]);
+    const isDownloading = useCallback((romFile: RomFile): boolean => {
+        return isRomDownloading(romFile);
+    }, [isRomDownloading]);
 
     return {
         downloadRom,
-        isRomDownloading,
+        isDownloading,
     };
 };

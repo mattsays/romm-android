@@ -194,5 +194,15 @@
     "noSearchResults": "Aucun résultat trouvé",
     "searchResultsFor": "Résultats pour \"{{query}}\"",
     "clearSearch": "Effacer la recherche",
-    "searchEmptyState": "Commencez à taper pour rechercher vos ROMs préférées"
+    "searchEmptyState": "Commencez à taper pour rechercher vos ROMs préférées",
+    "version": "Version",
+    "selectVersion": "Sélectionner la Version",
+    "fileSize": "Taille du Fichier",
+    "downloadSettings": "Paramètres de Téléchargement",
+    "unzipFiles": "Extraire les Fichiers",
+    "unzipFilesDescription": "Extraire automatiquement les fichiers compressés (ZIP, 7Z, RAR) après le téléchargement",
+    "concurrentDownloads": "Téléchargements Simultanés",
+    "concurrentDownloadsDescription": "Nombre maximum de téléchargements simultanés (1-5)",
+    "extracting": "Extraction",
+    "moving": "Déplacement"
 }

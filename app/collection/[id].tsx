@@ -37,7 +37,7 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
     const [collection, setCollection] = useState<ApiCollection | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [isDownloadingAll, setIsDownloadingAll] = useState(false);
-    const { activeDownloads, addToQueue, isDownloading, completedDownloads } = useDownload();
+    const { activeDownloads, addRomToQueue, isRomDownloading, completedDownloads } = useDownload();
     const { downloadRom } = useRomDownload();
     const { showErrorToast, showInfoToast, showSuccessToast } = useToast();
     const { platformFolders, searchPlatformFolder } = usePlatformFolders();
@@ -78,12 +78,17 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
 
     // Check filesystem for existing ROMs when ROMs are loaded
     useEffect(() => {
-        Promise.all(roms.map(rom => refreshRomCheck(rom)))
+        Promise.all(roms.map(async rom => {
+            const platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
+            if (!platformFolder) return;
+            // Check all files for each ROM
+            Promise.all(rom.files.map(file => refreshRomCheck(file, platformFolder)));
+        }));
     }, [roms, platformFolders]);
 
     // Monitor completed downloads to refresh ROM status in collection view
     useEffect(() => {
-        Promise.all(completedDownloads.map(downloadedItem => refreshRomCheck(downloadedItem.rom)));
+        Promise.all(completedDownloads.map(downloadedItem => refreshRomCheck(downloadedItem.romFile, downloadedItem.platformFolder)));
     }, [completedDownloads.length, roms.length]);
 
 
@@ -98,7 +103,9 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
                 if (roms && roms.length > 0) {
                     console.log('Force refreshing all ROM checks in collection');
                     for (const rom of roms) {
-                        await refreshRomCheck(rom);
+                        const platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
+                        if (!platformFolder) continue;
+                        await refreshRomCheck(rom.files[0], platformFolder);
                     }
                     console.log('All collection ROM checks refreshed');
                 }
@@ -114,7 +121,7 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
         if (!rom) return;
 
         try {
-            await downloadRom(rom);
+            await downloadRom(rom, rom.files[0], { name: rom.platform_name, slug: rom.platform_slug } as Platform);
         } catch (error: any) {
             console.error('Download error:', error);
 
@@ -161,7 +168,7 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
         }
 
         // Filter out ROMs that are already being downloaded or already exist on filesystem
-        const romsToDownload = roms.filter(rom => !isDownloading(rom.id) && !isRomDownloaded(rom.id));
+        const romsToDownload = roms.filter(rom => !isRomDownloading(rom.files[0]) && !isRomDownloaded(rom.files[0]));
 
         if (romsToDownload.length === 0) {
             showInfoToast(t('allRomsDownloaded'), t('info'));
@@ -182,7 +189,7 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
                             for (const rom of romsToDownload) {
                                 const platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
                                 if (platformFolder) {
-                                    addToQueue(rom, platformFolder);
+                                    addRomToQueue(rom, rom.files[0], platformFolder);
                                 }
                             }
 
@@ -212,6 +219,32 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
         // Calculate card height based on width to maintain aspect ratio
         const cardHeight = Math.floor(cardWidth * 1.4); // 1.4 aspect ratio
 
+        // Helper function to count downloaded versions
+        const getDownloadedVersionsCount = () => {
+            if (!rom.files || rom.files.length === 0) return 0;
+            return rom.files.filter(file => isRomDownloaded(file)).length;
+        };
+
+        // Helper function to check if any version is downloading
+        const isAnyVersionDownloading = () => {
+            if (!rom.files || rom.files.length === 0) return false;
+            return rom.files.some(file => isRomDownloading(file));
+        };
+
+        // Helper function to check if any version is being checked
+        const isAnyVersionChecking = () => {
+            if (!rom.files || rom.files.length === 0) return false;
+            return rom.files.some(file => isCheckingRom(file));
+        };
+
+        const downloadedCount = getDownloadedVersionsCount();
+        const totalVersions = rom.files?.length || 0;
+        const hasMultipleVersions = totalVersions > 1;
+        const anyDownloaded = downloadedCount > 0;
+        const anyDownloading = isAnyVersionDownloading();
+        const anyChecking = isAnyVersionChecking();
+        const allDownloaded = downloadedCount === totalVersions && totalVersions > 0;
+
         return (
             <Pressable
                 style={[styles.gameCard, { width: cardWidth }]}
@@ -233,24 +266,29 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
                     )}
 
                     {/* Status Badges */}
-                    {isRomDownloaded(rom.id) && (
+                    {anyDownloaded && (
                         <View style={styles.completedBadge}>
                             <Ionicons name="checkmark-circle" size={Math.min(24, cardWidth * 0.16)} color="#34C759" />
+                            {hasMultipleVersions && (
+                                <Text style={styles.versionCountBadge}>
+                                    {downloadedCount}/{totalVersions}
+                                </Text>
+                            )}
                         </View>
                     )}
-                    {isCheckingRom(rom.id) && (
+                    {anyChecking && !anyDownloaded && (
                         <View style={styles.checkingBadge}>
                             <ActivityIndicator size={Math.min(16, cardWidth * 0.11)} color="#FF9500" />
                         </View>
                     )}
-                    {isDownloading(rom.id) && (
+                    {anyDownloading && (
                         <View style={styles.downloadingBadge}>
                             <Ionicons name="download" size={Math.min(20, cardWidth * 0.13)} color="#FFFFFF" />
                         </View>
                     )}
 
-                    {/* Download Button - Only show if not downloaded and not downloading */}
-                    {!isRomDownloaded(rom.id) && !isDownloading(rom.id) && (
+                    {/* Download Button - Only show if not all versions downloaded and none downloading */}
+                    {!anyDownloaded && !anyDownloading && (
                         <View style={styles.romOverlay}>
                             <TouchableOpacity
                                 style={[styles.downloadButton, {
@@ -312,7 +350,7 @@ export default function CollectionScreen({ }: CollectionScreenProps) {
     };
 
     // Calculate available ROMs to download
-    const availableToDownload = roms.filter(rom => !isDownloading(rom.id) && !isRomDownloaded(rom.id)).length;
+    const availableToDownload = roms.filter(rom => !isRomDownloading(rom.files[0]) && !isRomDownloaded(rom.files[0])).length;
 
     return (
         <ProtectedRoute>
@@ -525,6 +563,16 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 3,
         elevation: 5,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    versionCountBadge: {
+        color: '#34C759',
+        fontSize: 10,
+        fontWeight: 'bold',
+        marginLeft: 2,
+        marginRight: 8,
     },
     checkingBadge: {
         position: 'absolute',

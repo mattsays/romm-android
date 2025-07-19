@@ -23,7 +23,7 @@ export const DownloadStatusBar: React.FC<DownloadStatusBarProps> = ({ onPress })
         return null;
     }
 
-    const currentDownload = activeDownloads.find(d => d.status === DownloadStatus.DOWNLOADING);
+    const currentDownload = activeDownloads.find(d => d.status === DownloadStatus.DOWNLOADING || d.status === DownloadStatus.PAUSED || d.status === DownloadStatus.MOVING || d.status === DownloadStatus.EXTRACTING);
     const pendingCount = activeDownloads.filter(d => d.status === DownloadStatus.PENDING).length;
 
     const formatBytes = (bytes: number): string => {

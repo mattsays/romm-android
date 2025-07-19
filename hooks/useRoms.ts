@@ -74,7 +74,7 @@ export function useRoms(): UseRomsReturn {
             }));
             console.error('Error fetching ROMs:', error);
         }
-    }, [offset, state.roms.length]);
+    }, [offset, state.roms]);
 
     const loadMoreRoms = useCallback(async () => {
         if (currentPlatformId !== null && state.hasMore && !state.loadingMore && !state.loading) {

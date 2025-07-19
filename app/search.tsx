@@ -1,3 +1,4 @@
+import { usePlatformFolders } from '@/hooks/usePlatformFolders';
 import { useRomDownload } from '@/hooks/useRomDownload';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -21,7 +22,7 @@ import { useDynamicColumns } from '../hooks/useDynamicColumns';
 import { useRomFileSystem } from '../hooks/useRomFileSystem';
 import { useRomsSearch } from '../hooks/useRoms';
 import { useTranslation } from '../hooks/useTranslation';
-import { Rom, SearchOrderCriteria, SearchOrderDirection } from '../services/api';
+import { Platform, Rom, SearchOrderCriteria, SearchOrderDirection } from '../services/api';
 
 interface SortOption {
     key: SearchOrderCriteria;
@@ -41,7 +42,8 @@ export default function SearchScreen() {
     const [sortDirection, setSortDirection] = useState<SearchOrderDirection>('asc');
     const { showErrorToast, showInfoToast } = useToast();
     const { downloadRom } = useRomDownload();
-    const { completedDownloads, isDownloading } = useDownload();
+    const { searchPlatformFolder } = usePlatformFolders();
+    const { completedDownloads, isRomDownloading } = useDownload();
     const { isRomDownloaded, isCheckingRom, refreshRomCheck } = useRomFileSystem();
     const { columns, cardWidth, isLandscape } = useDynamicColumns();
     const {
@@ -80,7 +82,11 @@ export default function SearchScreen() {
     // Monitor search results to refresh ROM status
     useEffect(() => {
         if (searchResults.length > 0) {
-            Promise.all(searchResults.map(rom => refreshRomCheck(rom)));
+            Promise.all(searchResults.map(async rom => {
+                const platformFolder = await searchPlatformFolder({ slug: rom.platform_slug, name: rom.platform_name } as Platform);
+                if (!platformFolder) return;
+                refreshRomCheck(rom.files[0], platformFolder);
+            }));
         }
     }, [searchResults.length, completedDownloads.length]);
 
@@ -98,7 +104,7 @@ export default function SearchScreen() {
         if (!rom) return;
 
         try {
-            await downloadRom(rom);
+            await downloadRom(rom, rom.files[0], { slug: rom.platform_slug, name: rom.platform_name } as Platform);
         } catch (error: any) {
             console.error('Download error:', error);
 
@@ -184,6 +190,32 @@ export default function SearchScreen() {
         // Calculate card height based on width to maintain aspect ratio
         const cardHeight = Math.floor(cardWidth * 1.4); // 1.4 aspect ratio
 
+        // Helper function to count downloaded versions
+        const getDownloadedVersionsCount = () => {
+            if (!rom.files || rom.files.length === 0) return 0;
+            return rom.files.filter(file => isRomDownloaded(file)).length;
+        };
+
+        // Helper function to check if any version is downloading
+        const isAnyVersionDownloading = () => {
+            if (!rom.files || rom.files.length === 0) return false;
+            return rom.files.some(file => isRomDownloading(file));
+        };
+
+        // Helper function to check if any version is being checked
+        const isAnyVersionChecking = () => {
+            if (!rom.files || rom.files.length === 0) return false;
+            return rom.files.some(file => isCheckingRom(file));
+        };
+
+        const downloadedCount = getDownloadedVersionsCount();
+        const totalVersions = rom.files?.length || 0;
+        const hasMultipleVersions = totalVersions > 1;
+        const anyDownloaded = downloadedCount > 0;
+        const anyDownloading = isAnyVersionDownloading();
+        const anyChecking = isAnyVersionChecking();
+        const allDownloaded = downloadedCount === totalVersions && totalVersions > 0;
+
         return (
             <TouchableOpacity
                 style={[styles.romCard, { width: cardWidth }]}
@@ -203,24 +235,29 @@ export default function SearchScreen() {
                     )}
 
                     {/* Status Badges */}
-                    {isRomDownloaded(rom.id) && (
+                    {anyDownloaded && (
                         <View style={styles.completedBadge}>
                             <Ionicons name="checkmark-circle" size={Math.min(24, cardWidth * 0.16)} color="#34C759" />
+                            {hasMultipleVersions && (
+                                <Text style={styles.versionCountBadge}>
+                                    {downloadedCount}/{totalVersions}
+                                </Text>
+                            )}
                         </View>
                     )}
-                    {isCheckingRom(rom.id) && (
+                    {anyChecking && !anyDownloaded && (
                         <View style={styles.checkingBadge}>
                             <ActivityIndicator size={Math.min(16, cardWidth * 0.11)} color="#FF9500" />
                         </View>
                     )}
-                    {isDownloading(rom.id) && (
+                    {anyDownloading && (
                         <View style={styles.downloadingBadge}>
                             <Ionicons name="download" size={Math.min(20, cardWidth * 0.13)} color="#FFFFFF" />
                         </View>
                     )}
 
-                    {/* Download Button - Only show if not downloaded and not downloading */}
-                    {!isRomDownloaded(rom.id) && !isDownloading(rom.id) && (
+                    {/* Download Button - Only show if not all versions downloaded and none downloading */}
+                    {!allDownloaded && !anyDownloading && (
                         <View style={styles.romOverlay}>
                             <TouchableOpacity
                                 style={[styles.downloadButton, {
@@ -575,6 +612,15 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.8)',
         borderRadius: 15,
         padding: 2,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    versionCountBadge: {
+        color: '#34C759',
+        fontSize: 10,
+        fontWeight: 'bold',
+        marginLeft: 2,
     },
     checkingBadge: {
         position: 'absolute',

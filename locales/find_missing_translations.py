@@ -29,6 +29,6 @@ for locale in ['de.json', 'es.json', 'fr.json', 'it.json', 'ja.json', 'nl.json',
         all_complete = False
 
 if all_complete:
-    print('\\n🎉 All locale files are now complete!')
+    print('\n🎉 All locale files are now complete!')
 else:
-    print('\\n❌ Some locale files still have missing keys.')
+    print('\n❌ Some locale files still have missing keys.')

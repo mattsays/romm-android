@@ -30,10 +30,9 @@ export default function PlatformScreen() {
     const { t } = useTranslation();
     const { roms, loading: romsLoading, loadingMore, hasMore, total, error: romsError, fetchRomsByPlatform, loadMoreRoms } = useRoms();
     const { platform: currentPlatform, loading: platformLoading, error: platformError, fetchPlatform } = usePlatform();
-    const { addToQueue, isDownloading, completedDownloads } = useDownload();
-    const { requestPlatformFolder, searchPlatformFolder, hasPlatformFolder } = usePlatformFolders();
+    const { addRomToQueue, isRomDownloading, completedDownloads } = useDownload();
+    const { platformFolders, requestPlatformFolder, searchPlatformFolder, hasPlatformFolder } = usePlatformFolders();
     const { isRomDownloaded, isCheckingRom, refreshRomCheck } = useRomFileSystem();
-    const { requestDirectoryPermissions } = useStorageAccessFramework();
     const { showSuccessToast, showErrorToast, showInfoToast } = useToast();
     const [isDownloadingAll, setIsDownloadingAll] = useState(false);
     const [folderSelectionShown, setFolderSelectionShown] = useState(false);
@@ -61,13 +60,13 @@ export default function PlatformScreen() {
 
     // Fetch ROMs when platform data is loaded
     useEffect(() => {
-        console.log('Fetching ROMs for platform ID:', platformId);
         fetchRomsByPlatform(platformId);
+        
     }, [platformId]);
 
     // Monitor completed downloads to refresh ROM status
     useEffect(() => {
-        Promise.all(completedDownloads.map(downloadedItem => refreshRomCheck(downloadedItem.rom)));
+        Promise.all(completedDownloads.map(downloadedItem => refreshRomCheck(downloadedItem.romFile, downloadedItem.platformFolder)));
     }, [completedDownloads.length, roms.length, currentPlatform]);
 
     // // Check if platform folder is configured and request if not (only after ROMs are loaded)
@@ -82,11 +81,19 @@ export default function PlatformScreen() {
             };
             checkFolder();
         }
-    }, [roms, currentPlatform, hasPlatformFolder]);
+    }, [roms.length, currentPlatform, hasPlatformFolder]);
 
     useEffect(() => {
-        Promise.all(roms.map(rom => refreshRomCheck(rom)))
-    }, [roms.length]);
+        Promise.all(roms.map(async rom => {
+
+            if(!currentPlatform) return;
+            const platformFolder = await searchPlatformFolder(currentPlatform);
+            if (!platformFolder) return;
+            await Promise.all(rom.files.map(file => {
+                refreshRomCheck(file, platformFolder);
+            }));
+        }));
+    }, [roms]);
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -101,10 +108,11 @@ export default function PlatformScreen() {
                 setTimeout(async () => {
                     if (currentPlatform && roms.length > 0) {
                         console.log('Force refreshing all ROM checks');
-                        for (const rom of roms) {
-                            await refreshRomCheck(rom);
-                        }
-                        console.log('All ROM checks refreshed');
+                        await Promise.all(roms.map(async rom => {
+                            const platformFolder = platformFolders.find(folder => folder.platformSlug === rom.platform_slug);
+                            if (!platformFolder) return;
+                            await Promise.all(rom.files.map(file => refreshRomCheck(file, platformFolder)));
+                        }));
                     }
                 }, 500); // Small delay to ensure data is updated
             }
@@ -133,7 +141,7 @@ export default function PlatformScreen() {
         }
 
         // Filter out ROMs that are already being downloaded or already exist on filesystem
-        const romsToDownload = roms.filter(rom => !isDownloading(rom.id) && !isRomDownloaded(rom.id));
+        const romsToDownload = roms.filter(rom => !isRomDownloading(rom.files[0]) && !isRomDownloaded(rom.files[0]));
 
         if (romsToDownload.length === 0) {
             showInfoToast(t('allRomsDownloaded'), t('info'));
@@ -152,7 +160,7 @@ export default function PlatformScreen() {
                         try {
                             // Add all ROMs to download queue
                             romsToDownload.forEach(rom => {
-                                addToQueue(rom, platformFolder);
+                                addRomToQueue(rom, rom.files[0], platformFolder);
                             });
 
                             showSuccessToast(
@@ -192,7 +200,7 @@ export default function PlatformScreen() {
             return;
         }
 
-        addToQueue(rom, platformFolder);
+        addRomToQueue(rom, rom.files[0], platformFolder);
     };
 
     const GameCard = ({ rom }: { rom: Rom & { isEmpty?: boolean } }) => {
@@ -204,6 +212,32 @@ export default function PlatformScreen() {
 
         // Calculate card height based on width to maintain aspect ratio
         const cardHeight = Math.floor(cardWidth * 1.4); // 1.4 aspect ratio
+
+        // Helper function to count downloaded versions
+        const getDownloadedVersionsCount = () => {
+            if (!rom.files || rom.files.length === 0) return 0;
+            return rom.files.filter(file => isRomDownloaded(file)).length;
+        };
+
+        // Helper function to check if any version is downloading
+        const isAnyVersionDownloading = () => {
+            if (!rom.files || rom.files.length === 0) return false;
+            return rom.files.some(file => isRomDownloading(file));
+        };
+
+        // Helper function to check if any version is being checked
+        const isAnyVersionChecking = () => {
+            if (!rom.files || rom.files.length === 0) return false;
+            return rom.files.some(file => isCheckingRom(file));
+        };
+
+        const downloadedCount = getDownloadedVersionsCount();
+        const totalVersions = rom.files?.length || 0;
+        const hasMultipleVersions = totalVersions > 1;
+        const anyDownloaded = downloadedCount > 0;
+        const anyDownloading = isAnyVersionDownloading();
+        const anyChecking = isAnyVersionChecking();
+        const allDownloaded = downloadedCount === totalVersions && totalVersions > 0;
 
         return (
             <Pressable
@@ -224,24 +258,29 @@ export default function PlatformScreen() {
                             </Text>
                         </View>
                     )}
-                    {isRomDownloaded(rom.id) && (
+                    {anyDownloaded && (
                         <View style={styles.completedBadge}>
                             <Ionicons name="checkmark-circle" size={Math.min(24, cardWidth * 0.16)} color="#34C759" />
+                            {hasMultipleVersions && (
+                                <Text style={styles.versionCountBadge}>
+                                    {downloadedCount}/{totalVersions}
+                                </Text>
+                            )}
                         </View>
                     )}
-                    {isCheckingRom(rom.id) && (
+                    {anyChecking && !anyDownloaded && (
                         <View style={styles.checkingBadge}>
                             <ActivityIndicator size={Math.min(16, cardWidth * 0.11)} color="#FF9500" />
                         </View>
                     )}
-                    {isDownloading(rom.id) && (
+                    {anyDownloading && (
                         <View style={styles.downloadingBadge}>
                             <Ionicons name="download" size={Math.min(20, cardWidth * 0.13)} color="#FFFFFF" />
                         </View>
                     )}
 
-                    {/* Download Button - Only show if not downloaded and not downloading */}
-                    {!isRomDownloaded(rom.id) && !isDownloading(rom.id) && (
+                    {/* Download Button - Only show if not all versions downloaded and none downloading */}
+                    {!anyDownloaded && !anyDownloading && (
                         <View style={styles.romOverlay}>
                             <TouchableOpacity
                                 style={[styles.downloadButton, {
@@ -277,7 +316,7 @@ export default function PlatformScreen() {
     }
 
     // Calculate available ROMs to download
-    const availableToDownload = roms.filter(rom => !isDownloading(rom.id) && !isRomDownloaded(rom.id)).length;
+    const availableToDownload = roms.filter(rom => !isRomDownloading(rom.files[0]) && !isRomDownloaded(rom.files[0])).length;
 
     // Prepare data for FlatList with empty items to fill last row
     const prepareGridData = (data: Rom[]) => {
@@ -614,6 +653,16 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 3,
         elevation: 5,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    versionCountBadge: {
+        color: '#34C759',
+        fontSize: 10,
+        fontWeight: 'bold',
+        marginLeft: 2,
+        marginRight: 4
     },
     checkingBadge: {
         position: 'absolute',

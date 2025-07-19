@@ -89,6 +89,8 @@
     "cancelled": "Cancelled",
     "unknown": "Unknown",
     "downloading": "Downloading",
+    "extracting": "Extracting",
+    "moving": "Moving",
     "completed": "Completed",
     "failed": "Failed",
     "paused": "Paused",
@@ -194,5 +196,13 @@
     "noSearchResults": "No results found",
     "searchResultsFor": "Results for \"{{query}}\"",
     "clearSearch": "Clear search",
-    "searchEmptyState": "Start typing to search for your favorite ROMs"
+    "searchEmptyState": "Start typing to search for your favorite ROMs",
+    "version": "Version",
+    "selectVersion": "Select Version",
+    "fileSize": "File Size",
+    "downloadSettings": "Download Settings",
+    "unzipFiles": "Extract Files",
+    "unzipFilesDescription": "Automatically extract compressed files (ZIP, 7Z, RAR) after download",
+    "concurrentDownloads": "Concurrent Downloads",
+    "concurrentDownloadsDescription": "Maximum number of simultaneous downloads (1-5)"
 }

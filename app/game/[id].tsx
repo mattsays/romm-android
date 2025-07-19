@@ -5,7 +5,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    FlatList,
     Image,
+    Modal,
     ScrollView,
     StyleSheet,
     Text,
@@ -30,7 +32,9 @@ export default function GameDetailsScreen() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [existingFilePath, setExistingFilePath] = useState<string | null>(null);
-    const { downloadRom, isRomDownloading } = useRomDownload();
+    const [selectedFileIndex, setSelectedFileIndex] = useState<number>(0);
+    const [showVersionSelector, setShowVersionSelector] = useState<boolean>(false);
+    const { downloadRom, isDownloading } = useRomDownload();
     const { getDownloadById, completedDownloads, activeDownloads } = useDownload();
     const { searchPlatformFolder } = usePlatformFolders();
     const { isRomDownloaded, isCheckingRom, refreshRomCheck, resetRomsCheck } = useRomFileSystem();
@@ -38,14 +42,21 @@ export default function GameDetailsScreen() {
     // Ref per tenere traccia dei download completati già processati
     const processedDownloadsRef = useRef<Set<string>>(new Set());
 
+    const getSelectedFile = () => {
+        if (!rom || !rom.files || rom.files.length === 0) return undefined;
+        return rom.files[selectedFileIndex] || rom.files[0];
+    };
+
     // Get the current download item for the ROM to access progress
     const getCurrentDownload = () => {
         if (!rom) return null;
-        return activeDownloads.find(download => download.rom.id === rom.id) || null;
+        return activeDownloads.find(download => download.romFile.rom_id === getSelectedFile()?.rom_id) || null;
     };
 
     const currentDownload = getCurrentDownload();
     const downloadProgress = (currentDownload?.progress || 0) / 100; // Progress is 0-100, convert to 0-1 for width percentage
+
+
 
     useEffect(() => {
         if (id) {
@@ -58,9 +69,13 @@ export default function GameDetailsScreen() {
     // Listen for completed downloads to refresh ROM check
     useEffect(() => {
         if (rom && completedDownloads.length > 0) {
+            const currentRomFile = getSelectedFile();
+
+            if (!currentRomFile) return;
+
             // Controlla solo i nuovi download completati che non sono stati processati
             const newCompletedDownloads = completedDownloads.filter(
-                download => download.rom.id === rom.id && !processedDownloadsRef.current.has(download.id)
+                download => download.romFile.rom_id === currentRomFile.rom_id && !processedDownloadsRef.current.has(download.id)
             );
 
             if (newCompletedDownloads.length > 0) {
@@ -71,30 +86,50 @@ export default function GameDetailsScreen() {
 
                 // Aggiorna lo stato per questa ROM
                 const refreshAndUpdate = async () => {
-                    await refreshRomCheck(rom);
+                    const platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
+
+                    if (!platformFolder) {
+                        console.error('No platform folder found for:', rom.platform_name);
+                        return;
+                    }
+
+                    await refreshRomCheck(currentRomFile, platformFolder);
                     await updateExistingFilePath(rom);
                 };
                 refreshAndUpdate();
             }
         }
-    }, [completedDownloads, rom?.id]);
+    }, [completedDownloads.length, getSelectedFile()?.id]);
 
     // Force check ROM status when ROM changes
     useEffect(() => {
         if (rom) {
             const checkRomStatus = async () => {
+                const platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
+                if (!platformFolder) {
+                    console.error('No platform folder found for:', rom.platform_name);
+                    return;
+                }
+                await refreshRomCheck(getSelectedFile()!, platformFolder);
                 await updateExistingFilePath(rom);
-                await refreshRomCheck(rom);
+
             };
             checkRomStatus();
         }
-    }, [rom?.id]);
+    }, [selectedFileIndex, rom?.id]);
+
+    // Update file path when selected version changes
+    useEffect(() => {
+        if (rom) {
+            updateExistingFilePath(rom);
+        }
+    }, [selectedFileIndex, rom]);
 
     const loadRomDetails = async () => {
         try {
             setLoading(true);
             setError(null);
-            const romData = await apiClient.getRomById(parseInt(id));
+            const romData = await apiClient.getRomById(parseInt(id), true);
             setRom(romData);
             // Update existing file path when ROM is loaded
             await updateExistingFilePath(romData);
@@ -108,7 +143,13 @@ export default function GameDetailsScreen() {
 
     const updateExistingFilePath = async (rom: Rom) => {
         try {
-            console.log('Updating existing file path for ROM:', rom.fs_name);
+            const selectedFile = getSelectedFile();
+            if (!selectedFile) {
+                setExistingFilePath(null);
+                return;
+            }
+
+            console.log('Updating existing file path for ROM file:', selectedFile.file_name);
             const platformSlug = rom.platform_slug;
             const platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
 
@@ -119,18 +160,16 @@ export default function GameDetailsScreen() {
             }
 
             console.log('Platform folder found:', platformFolder.folderUri);
-            
-            // Check if the ROM file exists in the platform folder
-            const romExists = await SAF.exists(
-                platformFolder.folderUri + '/' + rom.fs_name
-            );
 
-            if(romExists) {
-                setExistingFilePath(platformFolder.folderUri + '/' + rom.fs_name);
+            const files = await SAF.listFiles(platformFolder.folderUri);
+            const fileNameWithoutExtension = selectedFile.file_name.replace(/\.[^/.]+$/, '');
+            // Check if the ROM file exists in the platform folder
+            const romExists = files.some(file => file.name.replace(/\.[^/.]+$/, '') === fileNameWithoutExtension);
+            
+            if (romExists) {
+                setExistingFilePath(platformFolder.folderUri + '/' + fileNameWithoutExtension);
                 return;
             }
-
-            console.log('No matching file found for ROM:', rom.fs_name);
             // If no file found, clear the path
             setExistingFilePath(null);
         } catch (error) {
@@ -143,11 +182,21 @@ export default function GameDetailsScreen() {
         router.back();
     };
 
+    const formatFileSize = (bytes: number): string => {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+
+
     const handleDownload = async () => {
         if (!rom) return;
 
         try {
-            await downloadRom(rom);
+            await downloadRom(rom, getSelectedFile()!, { name: rom.platform_name, slug: rom.platform_slug } as Platform);
         } catch (error: any) {
             console.error('Download error:', error);
 
@@ -164,14 +213,15 @@ export default function GameDetailsScreen() {
     };
 
     const handleDeleteFile = async (rom: Rom) => {
-        if (!existingFilePath) {
+        const selectedFile = getSelectedFile();
+        if (!selectedFile) {
             showErrorToast(t('noFileToDelete'), t('error'));
             return;
         }
-
+        const fileNameWithoutExtension = selectedFile.file_name.replace(/\.[^/.]+$/, '');
         Alert.alert(
             t('confirmDeletion'),
-            t('confirmDeleteFile', { fileName: rom.name || rom.fs_name }),
+            t('confirmDeleteFile', { fileName: fileNameWithoutExtension }),
             [
                 {
                     text: t('cancel'),
@@ -189,25 +239,24 @@ export default function GameDetailsScreen() {
                                 throw new Error(t('platformFolderNotFound'));
                             }
 
-                            const romExists = await SAF.exists(
-                                platformFolder.folderUri + '/' + rom.fs_name
-                            );
+                            const fileList = await SAF.listFiles(platformFolder.folderUri);
 
-                            if (romExists) {
+                            const romFile = fileList.find(file => file.name.replace(/\.[^/.]+$/, '') === fileNameWithoutExtension);
+                            if (romFile) {
                                 await SAF.unlink(
-                                    platformFolder.folderUri + '/' + rom.fs_name
+                                    romFile.uri
                                 );
 
                                 // Update the state to reflect that the file is no longer downloaded
                                 setExistingFilePath(null);
                                 // Refresh the ROM check in the global state
-                                resetRomsCheck([rom])
+                                resetRomsCheck([getSelectedFile()!]);
 
                                 showSuccessToast(
                                     t('fileDeletedSuccessfully'),
                                     t('fileDeleted')
                                 );
-                            }                            
+                            }
                         } catch (error) {
                             console.error('Error deleting file:', error);
                             const errorMessage = error instanceof Error ? error.message : t('errorDeletingFile');
@@ -222,7 +271,18 @@ export default function GameDetailsScreen() {
         );
     };
 
+    const verifyRomFile = async (rom: Rom) => {
+        const platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
+        if (!platformFolder) {
+            return;
+        }
 
+        const selectedFile = getSelectedFile();
+
+        if (!selectedFile) return;
+
+        refreshRomCheck(selectedFile, platformFolder).then(() => updateExistingFilePath(rom))
+    };
 
     if (loading) {
         return (
@@ -284,23 +344,47 @@ export default function GameDetailsScreen() {
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>{t('information')}</Text>
                             <View style={styles.infoRow}>
-                                <Text style={styles.infoLabel}>{t('size')}:</Text>
-                                <Text style={styles.infoValue}>
-                                    {(rom.fs_size_bytes / (1024 * 1024)).toFixed(2)} MB
-                                </Text>
-                            </View>
-                            <View style={styles.infoRow}>
                                 <Text style={styles.infoLabel}>{t('platform')}:</Text>
                                 <Text style={styles.infoValue}>{rom.platform_name}</Text>
                             </View>
+                            { rom.files.length < 2 && (
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>{t('size')}:</Text>
+                                    <Text style={styles.infoValue}>{formatFileSize(rom.files[0].file_size_bytes)}</Text>
+                                </View>
+                            )}
                         </View>
+
+                        {/* Version Selector */}
+                        {rom.files && rom.files.length > 1 && (
+                            <View style={styles.section}>
+                                <Text style={styles.sectionTitle}>{t('selectVersion')}</Text>
+                                <TouchableOpacity
+                                    style={styles.versionSelector}
+                                    onPress={() => setShowVersionSelector(true)}
+                                >
+                                    <View style={styles.versionInfo}>
+                                        <Text style={styles.versionText}>
+                                            {getSelectedFile()?.file_name || `${t('version')} ${selectedFileIndex + 1}`}
+                                        </Text>
+                                        <Text style={styles.versionSize}>
+                                            {formatFileSize(getSelectedFile()?.file_size_bytes || 0)}
+                                        </Text>
+                                        <Text style={styles.versionCount}>
+                                            {selectedFileIndex + 1} / {rom.files.length}
+                                        </Text>
+                                    </View>
+                                    <Ionicons name="chevron-down" size={20} color="#ccc" />
+                                </TouchableOpacity>
+                            </View>
+                        )}
 
                         {/* Download Section */}
                         <View style={styles.section}>
                             {(() => {
-                                const isDownloaded = rom && isRomDownloaded(rom.id);
-                                const isChecking = rom && isCheckingRom(rom.id);
-                                const isCurrentlyDownloading = rom && isRomDownloading(rom.id);
+                                const isDownloaded = rom && isRomDownloaded(getSelectedFile()!);
+                                const isChecking = rom && isCheckingRom(getSelectedFile()!);
+                                const isCurrentlyDownloading = rom && isDownloading(getSelectedFile()!);
 
                                 if (isChecking) {
                                     return (
@@ -316,11 +400,6 @@ export default function GameDetailsScreen() {
                                                 <Ionicons name="checkmark-circle" size={24} color="#34C759" />
                                                 <Text style={styles.alreadyDownloadedTitle}>{t('fileAlreadyDownloaded')}</Text>
                                             </View>
-                                            {existingFilePath && (
-                                                <Text style={styles.alreadyDownloadedPath}>
-                                                    {t('filePath')}: {existingFilePath}
-                                                </Text>
-                                            )}
                                             <View style={styles.alreadyDownloadedActions}>
                                                 <TouchableOpacity
                                                     style={[styles.downloadButton, styles.redownloadButton]}
@@ -332,7 +411,7 @@ export default function GameDetailsScreen() {
                                                 </TouchableOpacity>
                                                 <TouchableOpacity
                                                     style={[styles.downloadButton, styles.verifyButton]}
-                                                    onPress={() => rom && refreshRomCheck(rom).then(() => updateExistingFilePath(rom))}
+                                                    onPress={() => rom && verifyRomFile(rom)}
                                                 >
                                                     <Ionicons name="refresh-outline" size={20} color="#fff" />
                                                     <Text style={styles.downloadButtonText}>{t('verify')}</Text>
@@ -393,6 +472,73 @@ export default function GameDetailsScreen() {
                     </View>
                 </View>
             </ScrollView>
+
+            {/* Version Selector Modal */}
+            <Modal
+                visible={showVersionSelector}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowVersionSelector(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>{t('selectVersion')}</Text>
+                            <TouchableOpacity
+                                onPress={() => setShowVersionSelector(false)}
+                                style={styles.closeButton}
+                            >
+                                <Ionicons name="close" size={24} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <FlatList
+                            data={rom?.files || []}
+                            keyExtractor={(_, index) => index.toString()}
+                            renderItem={({ item, index }) => {
+                                const correspondingFile = rom?.files[index];
+                                return (
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.versionItem,
+                                            selectedFileIndex === index && styles.versionItemSelected
+                                        ]}
+                                        onPress={() => {
+                                            setSelectedFileIndex(index);
+                                            setShowVersionSelector(false);
+                                        }}
+                                    >
+                                        <View style={styles.versionItemContent}>
+                                            <Text style={[
+                                                styles.versionItemTitle,
+                                                selectedFileIndex === index && styles.versionItemTitleSelected
+                                            ]}>
+                                                {item.file_name.replace(/\.[^/.]+$/, '') || `${t('version')} ${index + 1}`}
+                                            </Text>
+                                            <Text style={[
+                                                styles.versionItemSubtitle,
+                                                selectedFileIndex === index && styles.versionItemSubtitleSelected
+                                            ]}>
+                                                {/* Display file extension */}
+                                                {correspondingFile?.file_name.split('.').pop() }
+                                            </Text>
+                                            <Text style={[
+                                                styles.versionItemSize,
+                                                selectedFileIndex === index && styles.versionItemSizeSelected
+                                            ]}>
+                                                {formatFileSize(correspondingFile?.file_size_bytes || 0)}
+                                            </Text>
+                                        </View>
+                                        {selectedFileIndex === index && (
+                                            <Ionicons name="checkmark-circle" size={20} color="#5f43b2" />
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            }}
+                        />
+                    </View>
+                </View>
+            </Modal>
         </ProtectedRoute>
     );
 }
@@ -604,5 +750,106 @@ const styles = StyleSheet.create({
         backgroundColor: '#FF3B30',
         minWidth: '30%',
         flex: 1,
+    },
+    // Version Selector Styles
+    versionSelector: {
+        backgroundColor: '#111',
+        borderRadius: 12,
+        padding: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    versionInfo: {
+        flex: 1,
+    },
+    versionText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    versionSize: {
+        color: '#ccc',
+        fontSize: 14,
+    },
+    versionCount: {
+        color: '#999',
+        fontSize: 12,
+        marginTop: 4,
+    },
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: '#111',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        maxHeight: '70%',
+        paddingTop: 20,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+    },
+    modalTitle: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    closeButton: {
+        padding: 4,
+    },
+    versionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        marginHorizontal: 20,
+        marginVertical: 10,
+        borderRadius: 12,
+        backgroundColor: '#222',
+    },
+    versionItemSelected: {
+        backgroundColor: '#2a1f4b',
+        borderWidth: 1,
+        borderColor: '#5f43b2',
+    },
+    versionItemContent: {
+        flex: 1,
+    },
+    versionItemTitle: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    versionItemTitleSelected: {
+        color: '#5f43b2',
+    },
+    versionItemSubtitle: {
+        color: '#ccc',
+        fontSize: 14,
+        marginBottom: 2,
+    },
+    versionItemSubtitleSelected: {
+        color: '#fff',
+    },
+    versionItemSize: {
+        color: '#999',
+        fontSize: 12,
+    },
+    versionItemSizeSelected: {
+        color: '#ccc',
     },
 });

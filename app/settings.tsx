@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
+    Modal,
     ScrollView,
     StyleSheet,
+    Switch,
     Text,
     TouchableOpacity,
     View,
@@ -29,6 +32,9 @@ export default function SettingsScreen() {
         removeBaseFolder
     } = usePlatformFolders();
     const [baseFolder, setBaseFolderState] = useState<string | null>(null);
+    const [unzipFilesOnDownload, setUnzipFilesOnDownload] = useState<boolean>(true);
+    const [concurrentDownloads, setConcurrentDownloads] = useState<number>(2);
+    const [showConcurrentDownloadsPicker, setShowConcurrentDownloadsPicker] = useState<boolean>(false);
 
     const changePlatformFolder = async (platformSlug: string, platformName: string) => {
         try {
@@ -165,6 +171,76 @@ export default function SettingsScreen() {
         );
     };
 
+    const loadUnzipSetting = async () => {
+        try {
+            const value = await AsyncStorage.getItem('unzipFilesOnDownload');
+            if (value !== null) {
+                setUnzipFilesOnDownload(JSON.parse(value));
+            } else {
+                // Default value is true
+                setUnzipFilesOnDownload(true);
+            }
+        } catch (error) {
+            console.error('Error loading unzip setting:', error);
+            setUnzipFilesOnDownload(true); // Default fallback
+        }
+    };
+
+    const saveUnzipSetting = async (value: boolean) => {
+        try {
+            await AsyncStorage.setItem('unzipFilesOnDownload', JSON.stringify(value));
+            setUnzipFilesOnDownload(value);
+            showSuccessToast(
+                t('settings') + ' ' + t('success').toLowerCase(),
+                t('unzipFiles')
+            );
+        } catch (error) {
+            console.error('Error saving unzip setting:', error);
+            showErrorToast(
+                t('error'),
+                t('settings')
+            );
+        }
+    };
+
+    const loadConcurrentDownloadsSetting = async () => {
+        try {
+            const value = await AsyncStorage.getItem('concurrentDownloads');
+            if (value !== null) {
+                const numValue = parseInt(value, 10);
+                // Ensure the value is between 1 and 5
+                if (numValue >= 1 && numValue <= 5) {
+                    setConcurrentDownloads(numValue);
+                } else {
+                    setConcurrentDownloads(2); // Default fallback
+                }
+            } else {
+                // Default value is 2
+                setConcurrentDownloads(2);
+            }
+        } catch (error) {
+            console.error('Error loading concurrent downloads setting:', error);
+            setConcurrentDownloads(2); // Default fallback
+        }
+    };
+
+    const saveConcurrentDownloadsSetting = async (value: number) => {
+        try {
+            await AsyncStorage.setItem('concurrentDownloads', value.toString());
+            setConcurrentDownloads(value);
+            showSuccessToast(
+                t('settings') + ' ' + t('success').toLowerCase(),
+                t('concurrentDownloads')
+            );
+        } catch (error) {
+            console.error('Error saving concurrent downloads setting:', error);
+            showErrorToast(
+                t('error'),
+                t('settings')
+            );
+        }
+    };
+
     useEffect(() => {
         // Load configured platforms when the component mounts
         loadPlatformFolders();
@@ -180,6 +256,12 @@ export default function SettingsScreen() {
         };
 
         loadBaseFolder();
+
+        // Load unzip setting
+        loadUnzipSetting();
+
+        // Load concurrent downloads setting
+        loadConcurrentDownloadsSetting();
     }, []);
 
     return (
@@ -300,6 +382,46 @@ export default function SettingsScreen() {
 
                 </View>
 
+                {/* Download Settings Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>{t('downloadSettings')}</Text>
+                    <Text style={styles.sectionDescription}>
+                        {t('downloadSettings')}
+                    </Text>
+
+                    <View style={styles.settingItem}>
+                        <View style={styles.settingInfo}>
+                            <Text style={styles.settingTitle}>{t('unzipFiles')}</Text>
+                            <Text style={styles.settingDescription}>
+                                {t('unzipFilesDescription')}
+                            </Text>
+                        </View>
+                        <Switch
+                            value={unzipFilesOnDownload}
+                            onValueChange={saveUnzipSetting}
+                            trackColor={{ false: '#3e3e3e', true: '#4CAF50' }}
+                            thumbColor={unzipFilesOnDownload ? '#fff' : '#f4f3f4'}
+                            ios_backgroundColor="#3e3e3e"
+                        />
+                    </View>
+
+                    <View style={styles.settingItem}>
+                        <View style={styles.settingInfo}>
+                            <Text style={styles.settingTitle}>{t('concurrentDownloads')}</Text>
+                            <Text style={styles.settingDescription}>
+                                {t('concurrentDownloadsDescription')}
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.pickerButton}
+                            onPress={() => setShowConcurrentDownloadsPicker(true)}
+                        >
+                            <Text style={styles.pickerButtonText}>{concurrentDownloads}</Text>
+                            <Ionicons name="chevron-down" size={16} color="#ccc" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
                 {/* Language Selection Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>{t('language')}</Text>
@@ -342,6 +464,54 @@ export default function SettingsScreen() {
                 </View>
 
             </ScrollView>
+
+            {/* Concurrent Downloads Picker Modal */}
+            <Modal
+                visible={showConcurrentDownloadsPicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowConcurrentDownloadsPicker(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>{t('concurrentDownloads')}</Text>
+                            <TouchableOpacity
+                                onPress={() => setShowConcurrentDownloadsPicker(false)}
+                                style={styles.closeButton}
+                            >
+                                <Ionicons name="close" size={24} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.pickerOptions}>
+                            {[1, 2, 3, 4, 5].map((number) => (
+                                <TouchableOpacity
+                                    key={number}
+                                    style={[
+                                        styles.pickerOption,
+                                        concurrentDownloads === number && styles.pickerOptionSelected
+                                    ]}
+                                    onPress={() => {
+                                        saveConcurrentDownloadsSetting(number);
+                                        setShowConcurrentDownloadsPicker(false);
+                                    }}
+                                >
+                                    <Text style={[
+                                        styles.pickerOptionText,
+                                        concurrentDownloads === number && styles.pickerOptionTextSelected
+                                    ]}>
+                                        {number} {number === 1 ? 'download' : 'downloads'}
+                                    </Text>
+                                    {concurrentDownloads === number && (
+                                        <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -539,5 +709,103 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 8,
         right: 8,
+    },
+    settingItem: {
+        backgroundColor: '#111',
+        borderRadius: 12,
+        padding: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    settingInfo: {
+        flex: 1,
+        marginRight: 16,
+    },
+    settingTitle: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    settingDescription: {
+        color: '#ccc',
+        fontSize: 14,
+        lineHeight: 18,
+    },
+    pickerButton: {
+        backgroundColor: '#2C2C2E',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        minWidth: 60,
+        gap: 8,
+    },
+    pickerButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        backgroundColor: '#111',
+        borderRadius: 20,
+        margin: 20,
+        maxWidth: 300,
+        width: '80%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+    },
+    modalTitle: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    closeButton: {
+        padding: 4,
+    },
+    pickerOptions: {
+        padding: 20,
+    },
+    pickerOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        marginBottom: 8,
+        backgroundColor: '#222',
+    },
+    pickerOptionSelected: {
+        backgroundColor: '#1C4B3A',
+        borderWidth: 1,
+        borderColor: '#4CAF50',
+    },
+    pickerOptionText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    pickerOptionTextSelected: {
+        color: '#4CAF50',
+        fontWeight: '600',
     },
 });

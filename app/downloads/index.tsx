@@ -64,6 +64,10 @@ export default function DownloadsScreen() {
         switch (status) {
             case DownloadStatus.DOWNLOADING:
                 return '#007AFF';
+            case DownloadStatus.EXTRACTING:
+                return '#5856D6'; // Purple for extracting
+            case DownloadStatus.MOVING:
+                return '#FF9500'; // Orange for moving files
             case DownloadStatus.COMPLETED:
                 return '#34C759';
             case DownloadStatus.FAILED:
@@ -82,6 +86,10 @@ export default function DownloadsScreen() {
         switch (status) {
             case DownloadStatus.DOWNLOADING:
                 return t('downloading');
+            case DownloadStatus.EXTRACTING:
+                return t('extracting');
+            case DownloadStatus.MOVING:
+                return t('moving');
             case DownloadStatus.COMPLETED:
                 return t('completed');
             case DownloadStatus.FAILED:
@@ -149,7 +157,9 @@ export default function DownloadsScreen() {
                     )}
                     {(item.status === DownloadStatus.PENDING ||
                         item.status === DownloadStatus.DOWNLOADING ||
-                        item.status === DownloadStatus.PAUSED) && (
+                        item.status === DownloadStatus.PAUSED ||
+                        item.status === DownloadStatus.EXTRACTING ||
+                        item.status === DownloadStatus.MOVING) && (
                             <TouchableOpacity
                                 style={styles.actionButton}
                                 onPress={() => cancelDownload(item.id)}
@@ -167,34 +177,40 @@ export default function DownloadsScreen() {
             </View>
 
             {/* Progress bar for downloading items */}
-            {(item.status === DownloadStatus.DOWNLOADING || item.status === DownloadStatus.PAUSED) && (
-                <View style={styles.progressSection}>
-                    <View style={styles.progressBar}>
-                        <View
-                            style={[
-                                styles.progressFill,
-                                {
-                                    width: `${item.progress}%`,
-                                    backgroundColor: item.status === DownloadStatus.PAUSED ? '#FF9500' : '#007AFF'
+            {(item.status === DownloadStatus.DOWNLOADING ||
+                item.status === DownloadStatus.PAUSED ||
+                item.status === DownloadStatus.EXTRACTING ||
+                item.status === DownloadStatus.MOVING) && (
+                    <View style={styles.progressSection}>
+                        <View style={styles.progressBar}>
+                            <View
+                                style={[
+                                    styles.progressFill,
+                                    {
+                                        width: `${item.progress}%`,
+                                        backgroundColor: getStatusColor(item.status)
+                                    }
+                                ]}
+                            />
+                        </View>
+                        <View style={styles.progressInfo}>
+                            <Text style={styles.progressText}>
+                                {item.status === DownloadStatus.EXTRACTING || item.status === DownloadStatus.MOVING
+                                    ? getStatusText(item.status)
+                                    : `${formatBytes(item.downloadedBytes)} / ${formatBytes(item.totalBytes)}`
                                 }
-                            ]}
-                        />
-                    </View>
-                    <View style={styles.progressInfo}>
-                        <Text style={styles.progressText}>
-                            {formatBytes(item.downloadedBytes)} / {formatBytes(item.totalBytes)}
-                        </Text>
-                        <View style={styles.rightProgressInfo}>
-                            {item.status === DownloadStatus.DOWNLOADING && item.speed > 0 && (
-                                <Text style={styles.progressSpeed}>
-                                    {formatSpeed(item.speed)}
-                                </Text>
-                            )}
-                            <Text style={styles.progressPercentage}>{item.progress}%</Text>
+                            </Text>
+                            <View style={styles.rightProgressInfo}>
+                                {item.status === DownloadStatus.DOWNLOADING && item.speed > 0 && (
+                                    <Text style={styles.progressSpeed}>
+                                        {formatSpeed(item.speed)}
+                                    </Text>
+                                )}
+                                <Text style={styles.progressPercentage}>{item.progress}%</Text>
+                            </View>
                         </View>
                     </View>
-                </View>
-            )}
+                )}
 
             {/* Error message for failed downloads */}
             {item.status === DownloadStatus.FAILED && item.error && (
@@ -272,11 +288,13 @@ export default function DownloadsScreen() {
                         // Priority order: DOWNLOADING > PENDING > PAUSED > FAILED/CANCELLED > COMPLETED
                         const statusPriority = {
                             [DownloadStatus.DOWNLOADING]: 1,
-                            [DownloadStatus.PENDING]: 2,
-                            [DownloadStatus.PAUSED]: 3,
-                            [DownloadStatus.FAILED]: 4,
-                            [DownloadStatus.CANCELLED]: 4,
-                            [DownloadStatus.COMPLETED]: 5,
+                            [DownloadStatus.EXTRACTING]: 2,
+                            [DownloadStatus.MOVING]: 3,
+                            [DownloadStatus.PENDING]: 4,
+                            [DownloadStatus.PAUSED]: 5,
+                            [DownloadStatus.FAILED]: 6,
+                            [DownloadStatus.CANCELLED]: 6,
+                            [DownloadStatus.COMPLETED]: 7,
                         };
 
                         const priorityA = statusPriority[a.status] || 6;

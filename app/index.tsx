@@ -43,9 +43,9 @@ export default function LibraryScreen() {
     const { showErrorToast, showInfoToast } = useToast();
     const [refreshing, setRefreshing] = useState(false);
     const [recentRomsLoading, setRecentRomsLoading] = useState(false);
-    const { activeDownloads, isDownloading, completedDownloads } = useDownload();
+    const { activeDownloads, isRomDownloading, completedDownloads } = useDownload();
     const { downloadRom } = useRomDownload();
-    const { platformFolders, hasBaseFolder } = usePlatformFolders();
+    const { searchPlatformFolder, hasBaseFolder } = usePlatformFolders();
     const { resetRomsCheck, refreshRomCheck, isRomDownloaded, isCheckingRom } = useRomFileSystem();
     const insets = useSafeAreaInsets();
     const [showBaseFolderModal, setShowBaseFolderModal] = useState(false);
@@ -55,9 +55,13 @@ export default function LibraryScreen() {
         await fetchRecentlyAddedRoms();
         if (recentlyAddedRoms && recentlyAddedRoms.length > 0) {
             if (needResetRom) {
-                resetRomsCheck(recentlyAddedRoms);
+                resetRomsCheck(recentlyAddedRoms.map(rom => rom.files[0]));
             }
-            await Promise.all(recentlyAddedRoms.map(rom => refreshRomCheck(rom)));
+            await Promise.all(recentlyAddedRoms.map(async rom => {
+                const platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as ApiPlatform);
+                if (!platformFolder) return;
+                refreshRomCheck(rom.files[0], platformFolder);
+            }));
         }
     };
 
@@ -72,7 +76,7 @@ export default function LibraryScreen() {
             ]);
             console.log('Refresh completed');
             setRefreshing(false);
-            
+
         } catch (error) {
             console.error('Error during refresh:', error);
         } finally {
@@ -84,7 +88,7 @@ export default function LibraryScreen() {
     useEffect(() => {
         console.log('isAuthenticated:', isAuthenticated);
         if (isAuthenticated) {
-            
+
             Promise.all([
                 fetchPlatforms(),
                 fetchCollections(),
@@ -94,7 +98,7 @@ export default function LibraryScreen() {
     }, [isAuthenticated]);
 
     useEffect(() => {
-        resetRomsCheck(recentlyAddedRoms);
+        resetRomsCheck(recentlyAddedRoms.map(rom => rom.files[0]));
     }, []);
 
     // Check for base folder when authenticated
@@ -131,7 +135,7 @@ export default function LibraryScreen() {
 
     // Monitor completed downloads to refresh ROM status
     useEffect(() => {
-        Promise.all(completedDownloads.map(downloadedItem => refreshRomCheck(downloadedItem.rom)));
+        Promise.all(completedDownloads.map(downloadedItem => refreshRomCheck(downloadedItem.romFile, downloadedItem.platformFolder)));
     }, [completedDownloads.length]);
 
     const handleLogout = async () => {
@@ -173,7 +177,7 @@ export default function LibraryScreen() {
         if (!rom) return;
 
         try {
-            await downloadRom(rom);
+            await downloadRom(rom, rom.files[0], { name: rom.platform_name, slug: rom.platform_slug } as ApiPlatform);
 
         } catch (error: any) {
             console.error('Download error:', error);
@@ -243,63 +247,96 @@ export default function LibraryScreen() {
         </TouchableOpacity>
     );
 
-    const RomCard = ({ rom }: { rom: Rom }) => (
-        <TouchableOpacity
-            style={styles.romCard}
-            activeOpacity={0.8}
-            onPress={() => router.push(`/game/${rom.id}`)}
-        >
-            <View style={styles.romImageContainer}>
-                {rom.url_cover ? (
-                    <Image
-                        source={{ uri: rom.url_cover }}
-                        style={styles.romImage}
-                    />
-                ) : (
-                    <View style={styles.romPlaceholder}>
-                        <Ionicons name="game-controller-outline" size={32} color="#666" />
-                    </View>
-                )}
+    const RomCard = ({ rom }: { rom: Rom }) => {
+        // Helper function to count downloaded versions
+        const getDownloadedVersionsCount = () => {
+            if (!rom.files || rom.files.length === 0) return 0;
+            return rom.files.filter(file => isRomDownloaded(file)).length;
+        };
 
-                {/* Status Badges */}
-                {isRomDownloaded(rom.id) && (
-                    <View style={styles.completedBadge}>
-                        <Ionicons name="checkmark-circle" size={24} color="#34C759" />
-                    </View>
-                )}
-                {isCheckingRom(rom.id) && (
-                    <View style={styles.checkingBadge}>
-                        <ActivityIndicator size={16} color="#FF9500" />
-                    </View>
-                )}
-                {isDownloading(rom.id) && (
-                    <View style={styles.downloadingBadge}>
-                        <Ionicons name="download" size={20} color="#FFFFFF" />
-                    </View>
-                )}
+        // Helper function to check if any version is downloading
+        const isAnyVersionDownloading = () => {
+            if (!rom.files || rom.files.length === 0) return false;
+            return rom.files.some(file => isRomDownloading(file));
+        };
 
-                {/* Download Button - Only show if not downloaded and not downloading */}
-                {!isRomDownloaded(rom.id) && !isDownloading(rom.id) && (
-                    <View style={styles.romOverlay}>
-                        <TouchableOpacity
-                            style={styles.downloadButton}
-                            onPress={() => handleDownload(rom)}
-                        >
-                            <Ionicons name="download-outline" size={16} color="#fff" />
-                        </TouchableOpacity>
-                    </View>
-                )}
-            </View>
-            <View style={styles.romInfo}>
-                <Text style={styles.romName} numberOfLines={2}>
-                    {rom.name}
-                </Text>
-                <Text style={styles.romPlatform} numberOfLines={1}>
-                    {rom.platform_name}
-                </Text>
-            </View>
-        </TouchableOpacity>
-    );
+        // Helper function to check if any version is being checked
+        const isAnyVersionChecking = () => {
+            if (!rom.files || rom.files.length === 0) return false;
+            return rom.files.some(file => isCheckingRom(file));
+        };
+
+        const downloadedCount = getDownloadedVersionsCount();
+        const totalVersions = rom.files?.length || 0;
+        const hasMultipleVersions = totalVersions > 1;
+        const anyDownloaded = downloadedCount > 0;
+        const anyDownloading = isAnyVersionDownloading();
+        const anyChecking = isAnyVersionChecking();
+        const allDownloaded = downloadedCount === totalVersions && totalVersions > 0;
+
+        return (
+            <TouchableOpacity
+                style={styles.romCard}
+                activeOpacity={0.8}
+                onPress={() => router.push(`/game/${rom.id}`)}
+            >
+                <View style={styles.romImageContainer}>
+                    {rom.url_cover ? (
+                        <Image
+                            source={{ uri: rom.url_cover }}
+                            style={styles.romImage}
+                        />
+                    ) : (
+                        <View style={styles.romPlaceholder}>
+                            <Ionicons name="game-controller-outline" size={32} color="#666" />
+                        </View>
+                    )}
+
+                    {/* Status Badges */}
+                    {anyDownloaded && (
+                        <View style={styles.completedBadge}>
+                            <Ionicons name="checkmark-circle" size={24} color="#34C759" />
+                            {hasMultipleVersions && (
+                                <Text style={styles.versionCountBadge}>
+                                    {downloadedCount}/{totalVersions}
+                                </Text>
+                            )}
+                        </View>
+                    )}
+                    {anyChecking && !anyDownloaded && (
+                        <View style={styles.checkingBadge}>
+                            <ActivityIndicator size={16} color="#FF9500" />
+                        </View>
+                    )}
+                    {anyDownloading && (
+                        <View style={styles.downloadingBadge}>
+                            <Ionicons name="download" size={20} color="#FFFFFF" />
+                        </View>
+                    )}
+
+                    {/* Download Button - Only show if not all versions downloaded and none downloading */}
+                    {!anyDownloaded && !anyDownloading && (
+                        <View style={styles.romOverlay}>
+                            <TouchableOpacity
+                                style={styles.downloadButton}
+                                onPress={() => handleDownload(rom)}
+                            >
+                                <Ionicons name="download-outline" size={16} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
+                <View style={styles.romInfo}>
+                    <Text style={styles.romName} numberOfLines={2}>
+                        {rom.name}
+                    </Text>
+                    <Text style={styles.romPlatform} numberOfLines={1}>
+                        {rom.platform_name}
+                    </Text>
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     if (loading && collectionsLoading) {
         return (
@@ -738,6 +775,15 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 3,
         elevation: 5,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    versionCountBadge: {
+        color: '#34C759',
+        fontSize: 10,
+        fontWeight: 'bold',
+        marginLeft: 2,
     },
     checkingBadge: {
         position: 'absolute',

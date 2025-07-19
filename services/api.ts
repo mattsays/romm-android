@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
+
 const DEFAULT_API_URL = 'http://romm:8080';
 
 // Authentication types
@@ -74,15 +75,22 @@ export interface Collection {
 
 export interface RomFile {
     id: number;
+    rom_id: number;
     file_name: string;
-    file_name_no_tags: string;
-    file_name_no_ext: string;
     file_extension: string;
     file_path: string;
     file_size_bytes: number;
     md5_hash?: string;
     crc_hash?: string;
     sha1_hash?: string;
+}
+
+export interface RomSibling {
+    id: number;
+    name: string;
+    fs_name_no_tags: string;
+    fs_name_no_ext: string;
+    sort_comparator: string;
 }
 
 export interface Rom {
@@ -94,8 +102,10 @@ export interface Rom {
     platform_name: string;
     platform_slug: string;
     fs_name: string;
+    fs_name_no_ext: string;
     fs_size_bytes: number;
     files: RomFile[];
+    siblings?: RomSibling[];
     url_cover?: string;
     igdb_id?: number;
     sgdb_id?: number;
@@ -305,32 +315,88 @@ class ApiClient {
         return this.request<Collection>(`/api/collections/${collectionId}`);
     }
 
-    async getRomsByCollection(collectionId: string, isVirtual: boolean, limit: number = 10, offset: number = 0): Promise<ItemsResponse<Rom>> {
+    async getRomsByCollection(collectionId: string, isVirtual: boolean, limit: number = 10, offset: number = 0, includeSiblings: boolean = true): Promise<ItemsResponse<Rom>> {
+        
+        let roms;
+        
         if (isVirtual) {
-            return this.request<ItemsResponse<Rom>>(`/api/roms?virtual_collection_id=${collectionId}&limit=${limit}&offset=${offset}`);
+            roms = await this.request<ItemsResponse<Rom>>(`/api/roms?group_by_meta_id=1&virtual_collection_id=${collectionId}&limit=${limit}&offset=${offset}`);
+        } else {
+            roms = await this.request<ItemsResponse<Rom>>(`/api/roms?group_by_meta_id=1&collection_id=${collectionId}&limit=${limit}&offset=${offset}`);
         }
 
-        return this.request<ItemsResponse<Rom>>(`/api/roms?collection_id=${collectionId}&limit=${limit}&offset=${offset}`);
+        if (includeSiblings) {
+            // Fetch siblings for each ROM
+            await Promise.all(roms.items.map(async (rom) => {
+                if (rom.siblings) {
+                    await Promise.all(rom.siblings.map(async (sibling) => {
+                        const siblingFile = await this.request<Rom>(`/api/roms/${sibling.id}`);
+                        rom.files.push(siblingFile.files[0]);
+                    }));
+                }
+            }));
+        }
+
+        return roms;
     }
 
-    async getRomsRecentlyAdded(): Promise<Rom[]> {
-        const response = await this.request<ItemsResponse<Rom>>('/api/roms?order_by=id&order_dir=desc&limit=15');
-        return response.items;
+    async getRomsRecentlyAdded(includeSiblings: boolean = true): Promise<Rom[]> {
+
+        const response = await this.request<ItemsResponse<Rom>>('/api/roms?order_by=id&order_dir=desc&limit=15&group_by_meta_id=1');
+        const roms = response.items;
+
+        if (includeSiblings) {
+            // Fetch siblings for each ROM
+            await Promise.all(roms.map(async (rom) => {
+                if (rom.siblings) {
+                    await Promise.all(rom.siblings.map(async (sibling) => {
+                        const siblingFile = await this.request<Rom>(`/api/roms/${sibling.id}`);
+                        rom.files.push(siblingFile.files[0]);
+                    }));
+                }
+            }));
+        }
+
+        return roms;
     }
 
-    async getRomsByPlatform(platformId: number, limit: number = 20, offset: number = 0): Promise<ItemsResponse<Rom>> {
-        return this.request<ItemsResponse<Rom>>(`/api/roms?platform_id=${platformId}&limit=${limit}&offset=${offset}`);
+    async getRomsByPlatform(platformId: number, limit: number = 20, offset: number = 0, includeSiblings: boolean = true): Promise<ItemsResponse<Rom>> {
+        const res = await this.request<ItemsResponse<Rom>>(`/api/roms?platform_id=${platformId}&limit=${limit}&offset=${offset}&group_by_meta_id=1`);
+        const roms = res.items;
+
+        // Fetch siblings for each ROM
+        if (includeSiblings) {
+            await Promise.all(roms.map(async (rom) => {
+                if (rom.siblings) {
+                    await Promise.all(rom.siblings.map(async (sibling) => {
+                        const siblingFile = await this.request<Rom>(`/api/roms/${sibling.id}`);
+                        rom.files.push(siblingFile.files[0]);
+                    }));
+                }
+            }));
+        }
+
+        return res;
     }
 
-    async getRomById(romId: number): Promise<Rom> {
-        return this.request<Rom>(`/api/roms/${romId}`);
+    async getRomById(romId: number, includeSiblings: boolean = true): Promise<Rom> {
+        const rom = await this.request<Rom>(`/api/roms/${romId}`);
+        console.log('Fetched ROM:', rom.fs_name);
+        if (includeSiblings && rom.siblings) {
+            console.log('Fetching siblings:', rom.siblings);
+            await Promise.all(rom.siblings?.map(async (sibling) => {
+                const romFile = (await this.request<Rom>(`/api/roms/${sibling.id}`)).files[0];
+                console.log('Fetched sibling file:', romFile);
+                rom.files.push(romFile);
+            }));
+            console.log('Fetched siblings for ROM:', rom.name, 'Total siblings:', rom.files.length);
+        }
+        return rom;
     }
 
-    async obtainDownloadLink(rom: Rom): Promise<string> {
+    async obtainDownloadLink(romFile: RomFile): Promise<string> {
         await this.waitForTokenLoad();
-
-        const url = `${this.baseUrl}/api/roms/${rom.id}/content/${rom.fs_name}`;
-
+        const url = `${this.baseUrl}/api/roms/${romFile.rom_id}/content/${encodeURI(romFile.file_name)}`;
         return url; // Return the download URL for use with FileSystem
     }
 
@@ -344,15 +410,21 @@ class ApiClient {
 
     async searchRoms(query: string, options: SearchOptions = {}): Promise<ItemsResponse<Rom>> {
         const response = await this.request<ItemsResponse<Rom>>(
-            `/api/roms?search_term=${encodeURIComponent(query)}&order_by=${options.order_by || 'name'}&order_dir=${options.order_dir || 'asc'}&limit=${options.limit || 20}&offset=${options.offset || 0}`);
+            `/api/roms?group_by_meta_id=1&search_term=${encodeURIComponent(query)}&order_by=${options.order_by || 'name'}&order_dir=${options.order_dir || 'asc'}&limit=${options.limit || 20}&offset=${options.offset || 0}`);
         return response;
     }
 
     // Authentication methods
     async heartbeat(): Promise<boolean> {
         // Ping the server to check if it's alive
-        const response = await fetch(`${this.baseUrl}`);
-        return response.ok;
+        try {
+            const response = await fetch(`${this.baseUrl}`);
+            console.log('Heartbeat response status:', response.status);
+            return response.ok;
+        } catch (error) {
+            console.error('Error during heartbeat check:', error);
+            return false;
+        }
     }
 
     async login(credentials: LoginCredentials): Promise<MessageResponse> {
@@ -396,20 +468,6 @@ class ApiClient {
     }
 
     async logout(): Promise<MessageResponse> {
-        // try {
-        //     const response = await this.request<MessageResponse>('/api/logout', {
-        //         method: 'POST',
-        //     });
-
-        //     // Always remove token from storage after logout
-        //     await this.removeTokenFromStorage();
-
-        //     return response;
-        // } catch (error) {
-        //     // Even if logout fails, remove local token
-        //     await this.removeTokenFromStorage();
-        //     throw error;
-        // }
         await apiClient.removeTokenFromStorage();
         return { msg: 'Logged out successfully' };
     }
