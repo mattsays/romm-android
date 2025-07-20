@@ -69,7 +69,12 @@ export default function LoginScreen() {
         };
 
         if (serverUrl) {
-            testConnection();
+            // Add debouncing to avoid rapid state changes
+            const timeoutId = setTimeout(() => {
+                testConnection();
+            }, 800);
+
+            return () => clearTimeout(timeoutId);
         }
     }, [serverUrl]);
 
