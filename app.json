@@ -40,7 +40,8 @@
           },
           "ios": {}
         }
-      ]
+      ],
+      ["./plugins/withTrustLocalCerts.js"]
     ],
     "experiments": {
       "typedRoutes": true
