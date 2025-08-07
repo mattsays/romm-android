@@ -204,5 +204,18 @@
     "concurrentDownloads": "Gleichzeitige Downloads",
     "concurrentDownloadsDescription": "Maximale Anzahl gleichzeitiger Downloads (1-5)",
     "extracting": "Extrahieren",
-    "moving": "Verschieben"
+    "moving": "Verschieben",
+    "appUpdate": "App-Aktualisierung",
+    "appUpdateDescription": "Auf neue Versionen der App prüfen.",
+    "currentVersion": "Aktuelle Version: {{version}}",
+    "checkForUpdates": "Nach Updates suchen",
+    "checkingForUpdate": "Sucht...",
+    "updateAvailable": "Update verfügbar",
+    "noUpdatesAvailable": "Keine neuen Updates verfügbar.",
+    "upToDate": "Aktuell",
+    "updateCheckFailed": "Update-Prüfung fehlgeschlagen",
+    "download": "Herunterladen",
+    "downloadingUpdate": "Update wird heruntergeladen...",
+    "noApkFound": "Keine APK-Datei in der Version gefunden.",
+    "downloadFailed": "Download fehlgeschlagen"
 }

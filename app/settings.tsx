@@ -11,11 +11,16 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Platform,
+    ProgressBarAndroid,
 } from 'react-native';
 import { useToast } from '../contexts/ToastContext';
 import { usePlatformFolders } from '../hooks/usePlatformFolders';
 import { useStorageAccessFramework } from '../hooks/useStorageAccessFramework';
 import { useTranslation } from '../hooks/useTranslation';
+import { updateService, Release, Asset } from '../services/updateService';
+import { version } from '../package.json';
+
 
 export default function SettingsScreen() {
     const { t, locale, changeLanguage, supportedLocales, isLoading } = useTranslation();
@@ -35,6 +40,55 @@ export default function SettingsScreen() {
     const [unzipFilesOnDownload, setUnzipFilesOnDownload] = useState<boolean>(true);
     const [concurrentDownloads, setConcurrentDownloads] = useState<number>(2);
     const [showConcurrentDownloadsPicker, setShowConcurrentDownloadsPicker] = useState<boolean>(false);
+    const [updateAvailable, setUpdateAvailable] = useState<Release | null>(null);
+    const [isCheckingForUpdate, setIsCheckingForUpdate] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [downloadProgress, setDownloadProgress] = useState(0);
+
+    const handleCheckForUpdates = async () => {
+        setIsCheckingForUpdate(true);
+        try {
+            const release = await updateService.checkForUpdates();
+            if (release) {
+                setUpdateAvailable(release);
+                Alert.alert(
+                    t('updateAvailable'),
+                    `${release.name}\n\n${release.body}`,
+                    [
+                        { text: t('cancel'), style: 'cancel' },
+                        { text: t('download'), onPress: () => handleDownloadUpdate(release) }
+                    ]
+                );
+            } else {
+                showSuccessToast(t('noUpdatesAvailable'), t('upToDate'));
+            }
+        } catch (error) {
+            showErrorToast((error as Error).message, t('updateCheckFailed'));
+        } finally {
+            setIsCheckingForUpdate(false);
+        }
+    };
+
+    const handleDownloadUpdate = async (release: Release) => {
+        const apkAsset = release.assets.find(asset => asset.name.endsWith('.apk'));
+        if (!apkAsset) {
+            showErrorToast(t('noApkFound'), t('error'));
+            return;
+        }
+
+        setIsDownloading(true);
+        setDownloadProgress(0);
+
+        try {
+            await updateService.downloadUpdate(apkAsset, (progress) => {
+                setDownloadProgress(progress);
+            });
+        } catch (error) {
+            showErrorToast((error as Error).message, t('downloadFailed'));
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
     const changePlatformFolder = async (platformSlug: string, platformName: string) => {
         try {
@@ -422,6 +476,39 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
+                {/* App Update Section */}
+                {Platform.OS === 'android' && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>{t('appUpdate')}</Text>
+                        <Text style={styles.sectionDescription}>
+                            {t('appUpdateDescription')}
+                        </Text>
+                        <View style={styles.updateContainer}>
+                            <Text style={styles.versionText}>{t('currentVersion', { version })}</Text>
+                            <TouchableOpacity
+                                style={[styles.button, styles.checkButton]}
+                                onPress={handleCheckForUpdates}
+                                disabled={isCheckingForUpdate || isDownloading}
+                            >
+                                <Text style={styles.buttonText}>
+                                    {isCheckingForUpdate ? t('checkingForUpdate') : t('checkForUpdates')}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                        {isDownloading && (
+                            <View style={styles.downloadStatus}>
+                                <Text style={styles.downloadingText}>{t('downloadingUpdate')}</Text>
+                                <ProgressBarAndroid
+                                    styleAttr="Horizontal"
+                                    indeterminate={false}
+                                    progress={downloadProgress}
+                                    color="#4CAF50"
+                                />
+                            </View>
+                        )}
+                    </View>
+                )}
+
                 {/* Language Selection Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>{t('language')}</Text>
@@ -807,5 +894,28 @@ const styles = StyleSheet.create({
     pickerOptionTextSelected: {
         color: '#4CAF50',
         fontWeight: '600',
+    },
+    updateContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#111',
+        borderRadius: 12,
+        padding: 16,
+    },
+    versionText: {
+        color: '#ccc',
+        fontSize: 14,
+    },
+    checkButton: {
+        backgroundColor: '#007AFF',
+    },
+    downloadStatus: {
+        marginTop: 16,
+    },
+    downloadingText: {
+        color: '#ccc',
+        fontSize: 14,
+        marginBottom: 8,
     },
 });
