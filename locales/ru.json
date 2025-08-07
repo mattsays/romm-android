@@ -204,5 +204,18 @@
     "concurrentDownloads": "Одновременные загрузки",
     "concurrentDownloadsDescription": "Максимальное количество одновременных загрузок (1-5)",
     "extracting": "Извлечение",
-    "moving": "Перемещение"
+    "moving": "Перемещение",
+    "appUpdate": "Обновление приложения",
+    "appUpdateDescription": "Проверить наличие новых версий приложения.",
+    "currentVersion": "Текущая версия: {{version}}",
+    "checkForUpdates": "Проверить обновления",
+    "checkingForUpdate": "Проверка...",
+    "updateAvailable": "Доступно обновление",
+    "noUpdatesAvailable": "Нет доступных обновлений.",
+    "upToDate": "Актуальная версия",
+    "updateCheckFailed": "Ошибка проверки обновлений",
+    "download": "Скачать",
+    "downloadingUpdate": "Загрузка обновления...",
+    "noApkFound": "В релизе не найден APK-файл.",
+    "downloadFailed": "Ошибка загрузки"
 }
