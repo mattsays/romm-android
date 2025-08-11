@@ -5,6 +5,8 @@ import React, { useEffect, useState } from 'react';
 import {
     Alert,
     Modal,
+    Platform,
+    ProgressBarAndroid,
     ScrollView,
     StyleSheet,
     Switch,
@@ -16,6 +18,9 @@ import { useToast } from '../contexts/ToastContext';
 import { usePlatformFolders } from '../hooks/usePlatformFolders';
 import { useStorageAccessFramework } from '../hooks/useStorageAccessFramework';
 import { useTranslation } from '../hooks/useTranslation';
+import { version } from '../package.json';
+import { Release, updateService } from '../services/updateService';
+
 
 export default function SettingsScreen() {
     const { t, locale, changeLanguage, supportedLocales, isLoading } = useTranslation();
@@ -35,6 +40,61 @@ export default function SettingsScreen() {
     const [unzipFilesOnDownload, setUnzipFilesOnDownload] = useState<boolean>(true);
     const [concurrentDownloads, setConcurrentDownloads] = useState<number>(2);
     const [showConcurrentDownloadsPicker, setShowConcurrentDownloadsPicker] = useState<boolean>(false);
+    const [appUpdatesEnabled, setAppUpdatesEnabled] = useState<boolean>(true);
+    const [updateAvailable, setUpdateAvailable] = useState<Release | null>(null);
+    const [isCheckingForUpdate, setIsCheckingForUpdate] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [downloadProgress, setDownloadProgress] = useState(0);
+
+    const handleCheckForUpdates = async () => {
+        if (!appUpdatesEnabled) {
+            showErrorToast(t('enableAppUpdates'), t('error'));
+            return;
+        }
+
+        setIsCheckingForUpdate(true);
+        try {
+            const release = await updateService.checkForUpdates();
+            if (release) {
+                setUpdateAvailable(release);
+                Alert.alert(
+                    t('updateAvailable'),
+                    `${release.name}\n\n${release.body}`,
+                    [
+                        { text: t('cancel'), style: 'cancel' },
+                        { text: t('download'), onPress: () => handleDownloadUpdate(release) }
+                    ]
+                );
+            } else {
+                showSuccessToast(t('noUpdatesAvailable'), t('upToDate'));
+            }
+        } catch (error) {
+            showErrorToast((error as Error).message, t('updateCheckFailed'));
+        } finally {
+            setIsCheckingForUpdate(false);
+        }
+    };
+
+    const handleDownloadUpdate = async (release: Release) => {
+        const apkAsset = release.assets.find(asset => asset.name.endsWith('.apk'));
+        if (!apkAsset) {
+            showErrorToast(t('noApkFound'), t('error'));
+            return;
+        }
+
+        setIsDownloading(true);
+        setDownloadProgress(0);
+
+        try {
+            await updateService.downloadUpdate(apkAsset, (progress) => {
+                setDownloadProgress(progress);
+            });
+        } catch (error) {
+            showErrorToast((error as Error).message, t('downloadFailed'));
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
     const changePlatformFolder = async (platformSlug: string, platformName: string) => {
         try {
@@ -241,6 +301,38 @@ export default function SettingsScreen() {
         }
     };
 
+    const loadAppUpdatesEnabledSetting = async () => {
+        try {
+            const value = await AsyncStorage.getItem('appUpdatesEnabled');
+            if (value !== null) {
+                setAppUpdatesEnabled(JSON.parse(value));
+            } else {
+                // Default value is true
+                setAppUpdatesEnabled(true);
+            }
+        } catch (error) {
+            console.error('Error loading app updates setting:', error);
+            setAppUpdatesEnabled(true); // Default fallback
+        }
+    };
+
+    const saveAppUpdatesEnabledSetting = async (value: boolean) => {
+        try {
+            await AsyncStorage.setItem('appUpdatesEnabled', JSON.stringify(value));
+            setAppUpdatesEnabled(value);
+            showSuccessToast(
+                t('settings') + ' ' + t('success').toLowerCase(),
+                t('appUpdate')
+            );
+        } catch (error) {
+            console.error('Error saving app updates setting:', error);
+            showErrorToast(
+                t('error'),
+                t('settings')
+            );
+        }
+    };
+
     useEffect(() => {
         // Load configured platforms when the component mounts
         loadPlatformFolders();
@@ -262,6 +354,37 @@ export default function SettingsScreen() {
 
         // Load concurrent downloads setting
         loadConcurrentDownloadsSetting();
+
+        // Load app updates enabled setting and check for updates on Android
+        const loadAndCheckUpdates = async () => {
+            await loadAppUpdatesEnabledSetting();
+
+            // Auto-check for updates on startup (Android only)
+            if (Platform.OS === 'android') {
+                try {
+                    const updatesEnabled = await AsyncStorage.getItem('appUpdatesEnabled');
+                    const isEnabled = updatesEnabled !== null ? JSON.parse(updatesEnabled) : true;
+
+                    if (isEnabled) {
+                        // Check for updates silently in the background
+                        const release = await updateService.checkForUpdates();
+                        if (release) {
+                            setUpdateAvailable(release);
+                            // Show a toast notification instead of an immediate alert
+                            showSuccessToast(
+                                t('updateAvailable'),
+                                t('appUpdate')
+                            );
+                        }
+                    }
+                } catch (error) {
+                    // Silent fail for startup update check
+                    console.log('Startup update check failed:', error);
+                }
+            }
+        };
+
+        loadAndCheckUpdates();
     }, []);
 
     return (
@@ -421,6 +544,77 @@ export default function SettingsScreen() {
                         </TouchableOpacity>
                     </View>
                 </View>
+
+                {/* App Update Section */}
+                {Platform.OS === 'android' && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>{t('appUpdate')}</Text>
+                        <Text style={styles.sectionDescription}>
+                            {t('appUpdateDescription')}
+                        </Text>
+
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingTitle}>{t('enableAppUpdates')}</Text>
+                                <Text style={styles.settingDescription}>
+                                    {t('enableAppUpdatesDescription')}
+                                </Text>
+                            </View>
+                            <Switch
+                                value={appUpdatesEnabled}
+                                onValueChange={saveAppUpdatesEnabledSetting}
+                                trackColor={{ false: '#3e3e3e', true: '#4CAF50' }}
+                                thumbColor={appUpdatesEnabled ? '#fff' : '#f4f3f4'}
+                                ios_backgroundColor="#3e3e3e"
+                            />
+                        </View>
+
+                        <View style={styles.updateContainer}>
+                            <View style={styles.versionInfo}>
+                                <Text style={styles.versionText}>{t('currentVersion', { version })}</Text>
+                                {updateAvailable && (
+                                    <View style={styles.updateBadge}>
+                                        <Ionicons name="arrow-up-circle" size={16} color="#4CAF50" />
+                                        <Text style={styles.updateBadgeText}>{t('updateAvailable')}</Text>
+                                    </View>
+                                )}
+                            </View>
+                            <TouchableOpacity
+                                style={[
+                                    styles.button,
+                                    styles.checkButton,
+                                    !appUpdatesEnabled && styles.disabledButton,
+                                    updateAvailable && styles.updateAvailableButton
+                                ]}
+                                onPress={updateAvailable ? () => handleDownloadUpdate(updateAvailable) : handleCheckForUpdates}
+                                disabled={!appUpdatesEnabled || isCheckingForUpdate || isDownloading}
+                            >
+                                <Text style={[
+                                    styles.buttonText,
+                                    !appUpdatesEnabled && styles.disabledButtonText
+                                ]}>
+                                    {isCheckingForUpdate
+                                        ? t('checkingForUpdate')
+                                        : updateAvailable
+                                            ? t('download')
+                                            : t('checkForUpdates')
+                                    }
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                        {isDownloading && (
+                            <View style={styles.downloadStatus}>
+                                <Text style={styles.downloadingText}>{t('downloadingUpdate')}</Text>
+                                <ProgressBarAndroid
+                                    styleAttr="Horizontal"
+                                    indeterminate={false}
+                                    progress={downloadProgress}
+                                    color="#4CAF50"
+                                />
+                            </View>
+                        )}
+                    </View>
+                )}
 
                 {/* Language Selection Section */}
                 <View style={styles.section}>
@@ -807,5 +1001,52 @@ const styles = StyleSheet.create({
     pickerOptionTextSelected: {
         color: '#4CAF50',
         fontWeight: '600',
+    },
+    updateContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#111',
+        borderRadius: 12,
+        padding: 16,
+    },
+    versionInfo: {
+        flex: 1,
+    },
+    versionText: {
+        color: '#ccc',
+        fontSize: 14,
+    },
+    updateBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 4,
+        gap: 4,
+    },
+    updateBadgeText: {
+        color: '#4CAF50',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    checkButton: {
+        backgroundColor: '#007AFF',
+    },
+    updateAvailableButton: {
+        backgroundColor: '#4CAF50',
+    },
+    disabledButton: {
+        backgroundColor: '#555',
+        opacity: 0.6,
+    },
+    disabledButtonText: {
+        color: '#999',
+    },
+    downloadStatus: {
+        marginTop: 16,
+    },
+    downloadingText: {
+        color: '#ccc',
+        fontSize: 14,
+        marginBottom: 8,
     },
 });

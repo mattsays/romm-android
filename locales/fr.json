@@ -204,5 +204,20 @@
     "concurrentDownloads": "Téléchargements Simultanés",
     "concurrentDownloadsDescription": "Nombre maximum de téléchargements simultanés (1-5)",
     "extracting": "Extraction",
-    "moving": "Déplacement"
+    "moving": "Déplacement",
+    "appUpdate": "Mise à jour de l'application",
+    "appUpdateDescription": "Rechercher de nouvelles versions de l'application.",
+    "currentVersion": "Version actuelle : {{version}}",
+    "enableAppUpdates": "Activer les mises à jour de l'app",
+    "enableAppUpdatesDescription": "Permettre à l'app de vérifier et installer les mises à jour automatiquement au démarrage.",
+    "checkForUpdates": "Vérifier les mises à jour",
+    "checkingForUpdate": "Vérification...",
+    "updateAvailable": "Mise à jour disponible",
+    "noUpdatesAvailable": "Aucune nouvelle mise à jour disponible.",
+    "upToDate": "À jour",
+    "updateCheckFailed": "La vérification de la mise à jour a échoué",
+    "download": "Télécharger",
+    "downloadingUpdate": "Téléchargement de la mise à jour...",
+    "noApkFound": "Aucun fichier APK trouvé dans la version.",
+    "downloadFailed": "Le téléchargement a échoué"
 }

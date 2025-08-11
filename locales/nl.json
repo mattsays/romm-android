@@ -204,5 +204,20 @@
     "concurrentDownloads": "Gelijktijdige Downloads",
     "concurrentDownloadsDescription": "Maximum aantal gelijktijdige downloads (1-5)",
     "extracting": "Uitpakken",
-    "moving": "Verplaatsen"
+    "moving": "Verplaatsen",
+    "appUpdate": "App Update",
+    "appUpdateDescription": "Controleer op nieuwe versies van de app.",
+    "currentVersion": "Huidige Versie: {{version}}",
+    "enableAppUpdates": "App-updates inschakelen",
+    "enableAppUpdatesDescription": "De app toestaan om te controleren op en installeren van updates.",
+    "checkForUpdates": "Controleer op Updates",
+    "checkingForUpdate": "Controleren...",
+    "updateAvailable": "Update Beschikbaar",
+    "noUpdatesAvailable": "Geen nieuwe updates beschikbaar.",
+    "upToDate": "Up-to-date",
+    "updateCheckFailed": "Updatecontrole Mislukt",
+    "download": "Downloaden",
+    "downloadingUpdate": "Update downloaden...",
+    "noApkFound": "Geen APK-bestand gevonden in de release.",
+    "downloadFailed": "Download Mislukt"
 }

@@ -204,5 +204,20 @@
     "concurrentDownloads": "同時ダウンロード",
     "concurrentDownloadsDescription": "同時ダウンロードの最大数（1-5）",
     "extracting": "展開中",
-    "moving": "移動中"
+    "moving": "移動中",
+    "appUpdate": "アプリのアップデート",
+    "appUpdateDescription": "アプリの新しいバージョンを確認します。",
+    "currentVersion": "現在のバージョン: {{version}}",
+    "enableAppUpdates": "アプリの更新を有効にする",
+    "enableAppUpdatesDescription": "アプリが更新を確認してインストールすることを許可します。",
+    "checkForUpdates": "アップデートを確認",
+    "checkingForUpdate": "確認中...",
+    "updateAvailable": "アップデートがあります",
+    "noUpdatesAvailable": "新しいアップデートはありません。",
+    "upToDate": "最新です",
+    "updateCheckFailed": "アップデートの確認に失敗しました",
+    "download": "ダウンロード",
+    "downloadingUpdate": "アップデートをダウンロード中...",
+    "noApkFound": "リリースにAPKファイルが見つかりませんでした。",
+    "downloadFailed": "ダウンロードに失敗しました"
 }
