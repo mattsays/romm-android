@@ -139,8 +139,8 @@ export interface ItemsResponse<T> {
 
 class ApiClient {
     public baseUrl: string;
-    private sessionToken: string | null = null;
-    private tokenLoaded: boolean = false;
+    private credentials: LoginCredentials | null = null;
+    private credentialsLoaded: boolean = false;
 
     constructor() {
         // Try load url from secure storage
@@ -153,7 +153,7 @@ class ApiClient {
                     this.baseUrl = DEFAULT_API_URL;
                 }
                 console.log('API base URL set to:', this.baseUrl);
-                this.loadTokenFromStorage();
+                this.loadCredentialsFromStorage();
             });
     }
 
@@ -163,45 +163,54 @@ class ApiClient {
         this.baseUrl = newUrl.replace(/\/$/, '');
     }
 
-    private async loadTokenFromStorage(): Promise<void> {
+    private async loadCredentialsFromStorage(): Promise<void> {
         try {
-            const sessionToken = await SecureStore.getItemAsync('session_token');
+            const [username, password] = await Promise.all([
+                SecureStore.getItemAsync('username'),
+                SecureStore.getItemAsync('password')
+            ]);
 
-            if (sessionToken) {
-                this.sessionToken = sessionToken;
+            if (username && password) {
+                this.credentials = { username, password };
             }
         } catch (error) {
-            console.error('Failed to load token from storage:', error);
+            console.error('Failed to load credentials from storage:', error);
         } finally {
-            this.tokenLoaded = true;
+            this.credentialsLoaded = true;
         }
     }
 
     async waitForTokenLoad(): Promise<void> {
-        if (this.tokenLoaded) return;
+        if (this.credentialsLoaded) return;
 
         // Wait for token to be loaded
-        while (!this.tokenLoaded) {
+        while (!this.credentialsLoaded) {
             await new Promise(resolve => setTimeout(resolve, 50));
         }
     }
 
-    private async saveSessionTokenToStorage(sessionToken: string): Promise<void> {
+    private async saveCredentialsToStorage(credentials: LoginCredentials): Promise<void> {
         try {
-            await SecureStore.setItemAsync('session_token', sessionToken);
-            this.sessionToken = sessionToken;
+            await Promise.all([
+                SecureStore.setItemAsync('username', credentials.username),
+                SecureStore.setItemAsync('password', credentials.password)
+            ]);
+            this.credentials = credentials;
         } catch (error) {
-            console.error('Failed to save CSRF token to storage:', error);
+            console.error('Failed to save credentials to storage:', error);
         }
     }
 
-    private async removeTokenFromStorage(): Promise<void> {
+    private async removeCredentialsFromStorage(): Promise<void> {
         try {
-            console.debug('Removing token from storage');
-            await SecureStore.deleteItemAsync('session_token');
-            this.sessionToken = null;
+            console.debug('Removing credentials from storage');
+            await Promise.all([
+                SecureStore.deleteItemAsync('username'),
+                SecureStore.deleteItemAsync('password')
+            ]);
+            this.credentials = null;
         } catch (error) {
-            console.error('Failed to remove token from storage:', error);
+            console.error('Failed to remove credentials from storage:', error);
         }
     }
 
@@ -217,9 +226,8 @@ class ApiClient {
             'Content-Type': 'application/json',
         };
 
-        // Add CSRF token as cookie if available
-        if (this.sessionToken) {
-            defaultHeaders['Cookie'] = `romm_session=${this.sessionToken}`;
+        if (this.credentials) {
+            defaultHeaders['Authorization'] = `Basic ${btoa(`${this.credentials.username}:${this.credentials.password}`)}`;
         }
 
         // Merge with any provided headers
@@ -237,20 +245,12 @@ class ApiClient {
             if (!response.ok) {
                 if (response.status % 400 < 100) {
                     // Token expired or invalid, remove it
-                    await this.removeTokenFromStorage();
+                    await this.removeCredentialsFromStorage();
                     console.log("Response text:", await response.text());
                     throw new Error('Unauthorized - please login again');
                 }
                 console.log("Response text:", await response.text());
                 throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-
-
-            // Extract CSRF token from response
-            const sessionToken = this.extractSessionTokenFromResponse(response);
-            if (sessionToken) {
-                await this.saveSessionTokenToStorage(sessionToken);
             }
 
             const data = await response.json();
@@ -259,23 +259,6 @@ class ApiClient {
             console.error('API request failed:', error);
             throw error;
         }
-    }
-
-    private extractSessionTokenFromResponse(response: Response): string | null {
-        const setCookieHeader = response.headers.get('set-cookie');
-        if (!setCookieHeader) return null;
-
-        // Parse cookies from Set-Cookie header
-        const cookies = setCookieHeader.split(',').map(cookie => cookie.trim());
-
-        for (const cookie of cookies) {
-            if (cookie.startsWith('romm_session=')) {
-                const sessionMatch = cookie.match(/romm_session=([^;]+)/);
-                return sessionMatch ? sessionMatch[1] : null;
-            }
-        }
-
-        return null;
     }
 
     async getPlatforms(): Promise<Platform[]> {
@@ -402,9 +385,11 @@ class ApiClient {
 
     getAuthHeaders(): Record<string, string> {
         const headers: Record<string, string> = {};
-        if (this.sessionToken) {
-            headers['Cookie'] = `romm_session=${this.sessionToken}`;
+
+        if (this.credentials) {
+            headers['Authorization'] = `Basic ${btoa(`${this.credentials.username}:${this.credentials.password}`)}`;
         }
+
         return headers;
     }
 
@@ -448,15 +433,8 @@ class ApiClient {
                 }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            // Extract CSRF token from response cookies
-            console.log('Response headers:', response.headers.get("Set-Cookie"));
-            const sessionToken = this.extractSessionTokenFromResponse(response);
-            console.log('Session token from login response:', sessionToken);
-            if (sessionToken) {
-                await this.saveSessionTokenToStorage(sessionToken);
-            }
-
-
+            // Save credentials for future requests
+            await this.saveCredentialsToStorage(credentials);
 
             const data = await response.json();
             console.log('Login successful, response data:', data);
@@ -468,7 +446,7 @@ class ApiClient {
     }
 
     async logout(): Promise<MessageResponse> {
-        await apiClient.removeTokenFromStorage();
+        await this.removeCredentialsFromStorage();
         return { msg: 'Logged out successfully' };
     }
 
@@ -492,15 +470,11 @@ class ApiClient {
 
     // Token management
     isAuthenticated(): boolean {
-        return this.sessionToken !== null;
-    }
-
-    hassessionToken(): boolean {
-        return this.sessionToken !== null;
+        return this.credentials !== null;
     }
 
     async clearAuth(): Promise<void> {
-        await this.removeTokenFromStorage();
+        await this.removeCredentialsFromStorage();
     }
 }
 
