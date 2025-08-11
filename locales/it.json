@@ -208,6 +208,8 @@
     "appUpdate": "Aggiornamento App",
     "appUpdateDescription": "Controlla la presenza di nuove versioni dell'app.",
     "currentVersion": "Versione Corrente: {{version}}",
+    "enableAppUpdates": "Abilita Aggiornamenti App",
+    "enableAppUpdatesDescription": "Consenti all'app di controllare e installare aggiornamenti automaticamente all'avvio.",
     "checkForUpdates": "Controlla Aggiornamenti",
     "checkingForUpdate": "Controllo...",
     "updateAvailable": "Aggiornamento Disponibile",

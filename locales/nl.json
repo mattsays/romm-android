@@ -208,6 +208,8 @@
     "appUpdate": "App Update",
     "appUpdateDescription": "Controleer op nieuwe versies van de app.",
     "currentVersion": "Huidige Versie: {{version}}",
+    "enableAppUpdates": "App-updates inschakelen",
+    "enableAppUpdatesDescription": "De app toestaan om te controleren op en installeren van updates.",
     "checkForUpdates": "Controleer op Updates",
     "checkingForUpdate": "Controleren...",
     "updateAvailable": "Update Beschikbaar",

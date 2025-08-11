@@ -208,6 +208,8 @@
     "appUpdate": "Обновление приложения",
     "appUpdateDescription": "Проверить наличие новых версий приложения.",
     "currentVersion": "Текущая версия: {{version}}",
+    "enableAppUpdates": "Включить обновления приложения",
+    "enableAppUpdatesDescription": "Разрешить приложению проверять и устанавливать обновления.",
     "checkForUpdates": "Проверить обновления",
     "checkingForUpdate": "Проверка...",
     "updateAvailable": "Доступно обновление",
