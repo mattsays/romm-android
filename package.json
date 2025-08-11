@@ -19,7 +19,7 @@
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/elements": "^2.3.8",
     "@react-navigation/native": "^7.1.6",
-    "eas-cli": "^16.15.0",
+    "eas-cli": "^16.17.4",
     "expo": "53.0.20",
     "expo-auth-session": "^6.2.1",
     "expo-blur": "~14.1.5",
