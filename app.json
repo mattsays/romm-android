@@ -38,10 +38,16 @@
             "usesCleartextTraffic": true,
             "enableProguardInReleaseBuilds": true
           },
-          "ios": {}
+          "ios": {
+            "deploymentTarget": "16.0",
+            "useFrameworks": "static",
+            "modular_headers": true
+          }
         }
       ],
-      ["./plugins/withTrustLocalCerts.js"]
+      [
+        "./plugins/withTrustLocalCerts.js"
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -51,6 +57,9 @@
       "eas": {
         "projectId": "de44a04b-3068-4e9f-9474-7e9c3f73fbd9"
       }
+    },
+    "ios": {
+      "bundleIdentifier": "io.github.mattsays.rommandroid"
     }
   }
 }
