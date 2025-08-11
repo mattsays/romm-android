@@ -180,7 +180,7 @@ class ApiClient {
         }
     }
 
-    async waitForTokenLoad(): Promise<void> {
+    async waitForCredentialsLoad(): Promise<void> {
         if (this.credentialsLoaded) return;
 
         // Wait for token to be loaded
@@ -378,7 +378,7 @@ class ApiClient {
     }
 
     async obtainDownloadLink(romFile: RomFile): Promise<string> {
-        await this.waitForTokenLoad();
+        await this.waitForCredentialsLoad();
         const url = `${this.baseUrl}/api/roms/${romFile.rom_id}/content/${encodeURI(romFile.file_name)}`;
         return url; // Return the download URL for use with FileSystem
     }
