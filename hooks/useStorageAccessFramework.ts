@@ -78,26 +78,10 @@ export const useStorageAccessFramework = () => {
         return true;
     };
 
-
-    // Function to get a helpful error message for the current platform
-    const getPlatformErrorMessage = (): string => {
-        if (Platform.OS === 'ios' && __DEV__) {
-            return 'Storage access is not available on emulator. Please test on a real device.';
-        }
-        if (Platform.OS === 'ios') {
-            return 'Storage access requires user permission on iOS. Please grant access when prompted.';
-        }
-        if (Platform.OS === 'android') {
-            return 'Storage access requires user permission on Android. Please grant access when prompted.';
-        }
-        return 'Storage access is not supported on this platform.';
-    };
-
     return {
         requestDirectoryPermissions,
         readDirectoryContents,
         checkDirectoryPermissions,
         isSafAvailable,
-        getPlatformErrorMessage,
     };
 };
