@@ -163,9 +163,9 @@ jobs:
           # Create descriptive filename
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           if [ "${{ github.event_name }}" = "release" ]; then
-            NEW_NAME="romm-android-${{ github.ref_name }}.apk"
+            NEW_NAME="rommandroid-${{ github.ref_name }}.apk"
           else
-            NEW_NAME="romm-android-dev-${TIMESTAMP}.apk"
+            NEW_NAME="rommandroid-${TIMESTAMP}.apk"
           fi
           
           # Move and rename

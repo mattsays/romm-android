@@ -196,6 +196,7 @@ export const usePlatformFolders = () => {
     const loadPlatformFolders = useCallback(async () => {
         try {
             const allFolders = await AsyncStorage.getItem(STORAGE_KEY);
+            console.log('Loaded platform folders:', allFolders);
             if (allFolders) {
                 setPlatformFolders(JSON.parse(allFolders));
             } else {
@@ -224,8 +225,7 @@ export const usePlatformFolders = () => {
 
                     const files = await SAF.listFiles(baseFolder);
                     for (const file of files) {
-                        
-                        if (file.name === platform.slug) {
+                        if (file.name.toLowerCase() === platform.slug || file.name.toLowerCase() === platform.name.toLowerCase()) {
                             return await savePlatformFolder(platform.fs_slug, platform.name, file.uri);
                         }
                     }
@@ -264,6 +264,7 @@ export const usePlatformFolders = () => {
                             try {
                                 const folderUri = await requestDirectoryPermissions();
                                 if (folderUri) {
+                                    console.log('Selected folder URI:', folderUri);
                                     const savedFolder = await savePlatformFolder(platform.slug, platform.name, folderUri);
                                     
                                     showSuccessToast(

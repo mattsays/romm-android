@@ -217,6 +217,9 @@
     "upToDate": "Актуальная версия",
     "updateCheckFailed": "Ошибка проверки обновлений",
     "download": "Скачать",
+    "openWith": "Открыть с помощью",
+    "openWithApp": "Открыть в приложении",
+    "errorOpeningFile": "Ошибка при открытии файла",
     "downloadingUpdate": "Загрузка обновления...",
     "noApkFound": "В релизе не найден APK-файл.",
     "downloadFailed": "Ошибка загрузки"

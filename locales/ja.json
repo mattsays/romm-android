@@ -217,6 +217,9 @@
     "upToDate": "最新です",
     "updateCheckFailed": "アップデートの確認に失敗しました",
     "download": "ダウンロード",
+    "openWith": "次で開く",
+    "openWithApp": "アプリで開く",
+    "errorOpeningFile": "ファイルを開く際にエラーが発生しました",
     "downloadingUpdate": "アップデートをダウンロード中...",
     "noApkFound": "リリースにAPKファイルが見つかりませんでした。",
     "downloadFailed": "ダウンロードに失敗しました"

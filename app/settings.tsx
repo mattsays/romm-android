@@ -6,13 +6,12 @@ import {
     Alert,
     Modal,
     Platform,
-    ProgressBarAndroid,
     ScrollView,
     StyleSheet,
     Switch,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { useToast } from '../contexts/ToastContext';
 import { usePlatformFolders } from '../hooks/usePlatformFolders';
@@ -545,7 +544,7 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* App Update Section */}
+                App Update Section
                 {Platform.OS === 'android' && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>{t('appUpdate')}</Text>
@@ -605,12 +604,6 @@ export default function SettingsScreen() {
                         {isDownloading && (
                             <View style={styles.downloadStatus}>
                                 <Text style={styles.downloadingText}>{t('downloadingUpdate')}</Text>
-                                <ProgressBarAndroid
-                                    styleAttr="Horizontal"
-                                    indeterminate={false}
-                                    progress={downloadProgress}
-                                    color="#4CAF50"
-                                />
                             </View>
                         )}
                     </View>

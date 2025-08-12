@@ -1,7 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { openDocumentTree, mkdir, createFile, moveFile, unlink, stat, listFiles, exists } from "@joplin/react-native-saf-x";
 import { unzip, subscribe } from 'react-native-zip-archive';
-import { listZipContents } from 'react-native-zip-stream';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { PlatformFolder } from '../hooks/usePlatformFolders';

@@ -1,4 +1,5 @@
 import * as SAF from '@joplin/react-native-saf-x';
+import RNFetchBlob from "react-native-blob-util";
 import * as FileSystem from 'expo-file-system';
 import { useCallback, useMemo, useState } from 'react';
 import { Platform, Rom, RomFile } from '../services/api';
@@ -32,7 +33,6 @@ export const useRomFileSystem = () => {
             const fileNameWithoutExtension = romFile.file_name.replace(/\.[^/.]+$/, '');
 
             const fileList = await SAF.listFiles(platformFolder.folderUri);
-
             // Check if the ROM file exists in the platform folder
             const romExists = fileList.some(file => file.name.includes(fileNameWithoutExtension));
 

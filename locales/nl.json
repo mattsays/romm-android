@@ -217,6 +217,9 @@
     "upToDate": "Up-to-date",
     "updateCheckFailed": "Updatecontrole Mislukt",
     "download": "Downloaden",
+    "openWith": "Openen met",
+    "openWithApp": "Openen met app",
+    "errorOpeningFile": "Fout bij het openen van bestand",
     "downloadingUpdate": "Update downloaden...",
     "noApkFound": "Geen APK-bestand gevonden in de release.",
     "downloadFailed": "Download Mislukt"

@@ -217,6 +217,9 @@
     "upToDate": "Aktuell",
     "updateCheckFailed": "Update-Prüfung fehlgeschlagen",
     "download": "Herunterladen",
+    "openWith": "Öffnen mit",
+    "openWithApp": "Mit App öffnen",
+    "errorOpeningFile": "Fehler beim Öffnen der Datei",
     "downloadingUpdate": "Update wird heruntergeladen...",
     "noApkFound": "Keine APK-Datei in der Version gefunden.",
     "downloadFailed": "Download fehlgeschlagen"

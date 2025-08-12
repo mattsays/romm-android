@@ -46,7 +46,7 @@ class UpdateService {
             throw new Error('Updates are only supported on Android.');
         }
 
-        const downloadDest = FileSystem.documentDirectory + asset.name;
+        const downloadDest = FileSystem.cacheDirectory + asset.name;
 
         const downloadResumable = FileSystem.createDownloadResumable(
             asset.browser_download_url,
@@ -61,9 +61,9 @@ class UpdateService {
         );
 
         try {
-            const { uri } = await downloadResumable.downloadAsync();
-            console.log('Finished downloading to ', uri);
-            this.installUpdate(uri);
+            const res = await downloadResumable.downloadAsync();
+            console.log('Finished downloading to ', res?.uri);
+            this.installUpdate(res?.uri || '');
         } catch (e) {
             console.error(e);
             throw new Error('Failed to download update.');
@@ -72,11 +72,14 @@ class UpdateService {
 
     private async installUpdate(uri: string): Promise<void> {
         try {
-            await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-                data: uri,
-                flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+            const contentUri = await FileSystem.getContentUriAsync(uri);
+            console.log('Installing update from:', contentUri);
+            const res = await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+                data: contentUri, // Convert file URI to content URI
+                flags: 0x10000000 | 1, // FLAG_ACTIVITY_NEW_TASK | FLAG_GRANT_READ_URI_PERMISSION
                 type: 'application/vnd.android.package-archive',
             });
+            console.log('Update installation started:', res);
         } catch (e) {
             console.error('Failed to install update:', e);
             throw new Error('Failed to start installer.');
