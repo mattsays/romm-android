@@ -481,7 +481,12 @@ export default function LibraryScreen() {
                         {platforms.length > 0 ? (
                             <FlatList
                                 data={platforms}
-                                renderItem={({ item }) => <PlatformCard platform={item} />}
+                                renderItem={({ item }) => {
+                                    if (item.rom_count > 0) {
+                                        return <PlatformCard platform={item} />;
+                                    }
+                                    return null;
+                                }}
                                 keyExtractor={(item) => item.id.toString()}
                                 horizontal
                                 showsHorizontalScrollIndicator={false}
