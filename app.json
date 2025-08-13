@@ -2,7 +2,7 @@
   "expo": {
     "name": "RomM",
     "slug": "RomM",
-    "version": "1.1.0",
+    "version": "1.0.0",
     "icon": "./assets/images/icon.png",
     "scheme": "rommandroid",
     "userInterfaceStyle": "automatic",
@@ -16,6 +16,7 @@
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.REQUEST_INSTALL_PACKAGES",
         "android.permission.INTERNET"
       ],
       "package": "io.github.mattsays.rommandroid"

@@ -2,6 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as SAF from '@joplin/react-native-saf-x';
 import * as FileSystem from 'expo-file-system';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import * as IntentLauncher from 'expo-intent-launcher';
+import { Linking } from 'react-native';
+import * as RNFS from 'react-native-fs';
+import * as FileSystem from 'expo-file-system';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -15,7 +19,8 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
+    PermissionsAndroid
 } from 'react-native';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
 import { useDownload } from '../../contexts/DownloadContext';
@@ -26,6 +31,43 @@ import { useRomFileSystem } from '../../hooks/useRomFileSystem';
 import { useTranslation } from '../../hooks/useTranslation';
 import { apiClient, Platform, Rom } from '../../services/api';
 
+const EJS_SUPPORTED_PLATFORMS: string[] = [
+    '3do',
+    'amiga',
+    'arcade',
+    'atari2600',
+    'atari5200',
+    'atari7800',
+    'jaguar',
+    'lynx',
+    'c64',
+    'colecovision',
+    'doom',
+    'neo-geo-pocket',
+    'neo-geo-pocket-color',
+    'dos',
+    'n64',
+    'nes',
+    'famicom',
+    'nds',
+    'gb',
+    'gbc',
+    'gba',
+    'pc-fx',
+    'psx',
+    'sega32',
+    'segacd',
+    'gamegear',
+    'sms',
+    'genesis',
+    'saturn',
+    'snes',
+    'sfam',
+    'tg16',
+    'virtualboy',
+    'wonderswan',
+    'wonderswan-color',
+];
 
 export default function GameDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -59,8 +101,6 @@ export default function GameDetailsScreen() {
 
     const currentDownload = getCurrentDownload();
     const downloadProgress = (currentDownload?.progress || 0) / 100; // Progress is 0-100, convert to 0-1 for width percentage
-
-
 
     useEffect(() => {
         if (id) {
@@ -175,7 +215,6 @@ export default function GameDetailsScreen() {
             const fileNameWithoutExtension = selectedFile.file_name.replace(/\.[^/.]+$/, '');
             // Check if the ROM file exists in the platform folder
             const romExists = files.some(file => file.replace(/\.[^/.]+$/, '') === fileNameWithoutExtension);
-            
             if (romExists) {
                 setExistingFilePath(platformFolder.folderUri + '/' + fileNameWithoutExtension);
                 return;
@@ -307,6 +346,25 @@ export default function GameDetailsScreen() {
         refreshRomCheck(selectedFile, platformFolder).then(() => updateExistingFilePath(rom))
     };
 
+    const handleOpenWith = async (rom: Rom) => {
+        try {
+            // Construct the WebView URL: romm_url/rom/{rom_id}/ejs
+            const url = `${apiClient.baseUrl}/rom/${rom.id}/ejs`;
+
+            console.log('Opening ROM in WebView:', url);
+
+            // Navigate to the WebView page
+            router.push(`/webview/${encodeURIComponent(url)}?title=${encodeURIComponent(rom.name || rom.fs_name)}`);
+        } catch (error) {
+            console.error('Error opening ROM URL:', error);
+            const errorMessage = error instanceof Error ? error.message : t('errorOpeningFile');
+            showErrorToast(
+                errorMessage,
+                t('error')
+            );
+        }
+    };
+
     if (loading) {
         return (
             <ProtectedRoute>
@@ -370,7 +428,7 @@ export default function GameDetailsScreen() {
                                 <Text style={styles.infoLabel}>{t('platform')}:</Text>
                                 <Text style={styles.infoValue}>{rom.platform_name}</Text>
                             </View>
-                            { rom.files.length < 2 && (
+                            {rom.files.length < 2 && (
                                 <View style={styles.infoRow}>
                                     <Text style={styles.infoLabel}>{t('size')}:</Text>
                                     <Text style={styles.infoValue}>{formatFileSize(rom.files[0].file_size_bytes)}</Text>
@@ -424,6 +482,13 @@ export default function GameDetailsScreen() {
                                                 <Text style={styles.alreadyDownloadedTitle}>{t('fileAlreadyDownloaded')}</Text>
                                             </View>
                                             <View style={styles.alreadyDownloadedActions}>
+                                               {EJS_SUPPORTED_PLATFORMS.includes(rom?.platform_slug) && <TouchableOpacity
+                                                    style={[styles.downloadButton, styles.openButton]}
+                                                    onPress={() => handleOpenWith(rom)}
+                                                >
+                                                    <Ionicons name="open-outline" size={20} color="#fff" />
+                                                    <Text style={styles.downloadButtonText}>{t('openWith')}</Text>
+                                                </TouchableOpacity>}
                                                 <TouchableOpacity
                                                     style={[styles.downloadButton, styles.redownloadButton]}
                                                     onPress={handleDownload}
@@ -543,7 +608,7 @@ export default function GameDetailsScreen() {
                                                 selectedFileIndex === index && styles.versionItemSubtitleSelected
                                             ]}>
                                                 {/* Display file extension */}
-                                                {correspondingFile?.file_name.split('.').pop() }
+                                                {correspondingFile?.file_name.split('.').pop()}
                                             </Text>
                                             <Text style={[
                                                 styles.versionItemSize,
@@ -758,21 +823,23 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 8,
+        justifyContent: 'space-between',
+    },
+    openButton: {
+        backgroundColor: '#32D74B',
+        flex: 0.3,
     },
     redownloadButton: {
         backgroundColor: '#FF9500',
-        minWidth: '30%',
-        flex: 1,
+        flex: 0.3,
     },
     verifyButton: {
         backgroundColor: '#007AFF',
-        minWidth: '30%',
-        flex: 1,
+        flex: 0.3,
     },
     deleteButton: {
         backgroundColor: '#FF3B30',
-        minWidth: '30%',
-        flex: 1,
+        flex: 0.3,
     },
     // Version Selector Styles
     versionSelector: {

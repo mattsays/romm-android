@@ -9,6 +9,7 @@ import {
     Dimensions,
     FlatList,
     Image,
+    Platform,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -30,6 +31,7 @@ import { useRomFileSystem } from '../hooks/useRomFileSystem';
 import { usePlatforms, useRoms } from '../hooks/useRoms';
 import { useTranslation } from '../hooks/useTranslation';
 import { apiClient, Platform as ApiPlatform, Collection, CollectionType, Rom } from '../services/api';
+import { updateService } from '../services/updateService';
 
 const { width } = Dimensions.get('window');
 
@@ -40,7 +42,7 @@ export default function LibraryScreen() {
     const { recentlyAddedRoms, fetchRecentlyAddedRoms } = useRoms();
     const { user, username, isAuthenticated } = useAuthCheck();
     const { logout, isLoading: isLoggingOut } = useLogout();
-    const { showErrorToast, showInfoToast } = useToast();
+    const { showErrorToast, showInfoToast, showSuccessToast } = useToast();
     const [refreshing, setRefreshing] = useState(false);
     const [recentRomsLoading, setRecentRomsLoading] = useState(false);
     const { activeDownloads, isRomDownloading, completedDownloads } = useDownload();
@@ -74,6 +76,10 @@ export default function LibraryScreen() {
                 fetchCollections(),
                 loadRecentRoms(true),
             ]);
+
+            // Also check for app updates on refresh (Android only)
+            checkForAppUpdates();
+
             console.log('Refresh completed');
             setRefreshing(false);
 
@@ -94,6 +100,9 @@ export default function LibraryScreen() {
                 fetchCollections(),
                 loadRecentRoms(true)
             ]);
+
+            // Check for app updates when entering the library (Android only)
+            checkForAppUpdates();
         }
     }, [isAuthenticated]);
 
@@ -338,6 +347,36 @@ export default function LibraryScreen() {
         );
     };
 
+    // Function to check for app updates (Android only)
+    const checkForAppUpdates = async () => {
+        if (Platform.OS !== 'android') return;
+
+        try {
+            // Check if app updates are enabled
+            const updatesEnabled = await AsyncStorage.getItem('appUpdatesEnabled');
+            const isEnabled = updatesEnabled !== null ? JSON.parse(updatesEnabled) : true;
+
+            if (!isEnabled) return;
+
+            // Check for updates silently in the background
+            const release = await updateService.checkForUpdates();
+            if (release) {
+                // Show a toast notification about the available update
+                showSuccessToast(
+                    t('updateAvailable'),
+                    t('settings')
+                );
+            }
+        } catch (error) {
+            // Silent fail for library screen update check
+            console.log('Library screen update check failed:', error);
+        }
+    };
+
+    useEffect(() => {
+        checkForAppUpdates();
+    }, [isAuthenticated]);
+
     if (loading && collectionsLoading) {
         return (
             <View style={[styles.container, styles.centered]}>
@@ -442,7 +481,12 @@ export default function LibraryScreen() {
                         {platforms.length > 0 ? (
                             <FlatList
                                 data={platforms}
-                                renderItem={({ item }) => <PlatformCard platform={item} />}
+                                renderItem={({ item }) => {
+                                    if (item.rom_count > 0) {
+                                        return <PlatformCard platform={item} />;
+                                    }
+                                    return null;
+                                }}
                                 keyExtractor={(item) => item.id.toString()}
                                 horizontal
                                 showsHorizontalScrollIndicator={false}

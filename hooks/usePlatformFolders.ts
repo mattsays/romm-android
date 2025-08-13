@@ -228,6 +228,7 @@ export const usePlatformFolders = () => {
     const loadPlatformFolders = useCallback(async () => {
         try {
             const allFolders = await AsyncStorage.getItem(STORAGE_KEY);
+            console.log('Loaded platform folders:', allFolders);
             if (allFolders) {
                 setPlatformFolders(JSON.parse(allFolders));
             } else {

@@ -429,7 +429,7 @@ class ApiClient {
             if (!response.ok) {
                 console.log("Repsonse body:", await response.text());
                 if (response.status === 401) {
-                    throw new Error('Credenziali non valide');
+                    throw new Error('Unauthorized. Please check your credentials');
                 }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }

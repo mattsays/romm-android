@@ -1,4 +1,5 @@
 import * as SAF from '@joplin/react-native-saf-x';
+import RNFetchBlob from "react-native-blob-util";
 import * as FileSystem from 'expo-file-system';
 import { useCallback, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
@@ -31,6 +32,7 @@ export const useRomFileSystem = () => {
         try {
 
             const fileNameWithoutExtension = romFile.file_name.replace(/\.[^/.]+$/, '');
+
 
             var fileList;
 
