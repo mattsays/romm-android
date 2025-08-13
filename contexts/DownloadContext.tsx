@@ -8,6 +8,7 @@ import { PlatformFolder } from '../hooks/usePlatformFolders';
 import { useRomFileSystem } from '../hooks/useRomFileSystem';
 import { apiClient, Rom, RomFile } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // Define the types here to avoid import issues
 export enum DownloadStatus {
@@ -228,14 +229,14 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
 
             const updateDownloadProgress = async (filePath: string, expectedFileSize: number) => {
 
-                const fileExists = await exists(filePath);
+                const fileExists = await ReactNativeBlobUtil.fs.exists(filePath);
 
                 if(!fileExists) {
                     setTimeout(() => { updateDownloadProgress(filePath, expectedFileSize) }, 100);
                     return;
                 }
 
-                const fileStatus = await stat(filePath);
+                const fileStatus = await ReactNativeBlobUtil.fs.stat(filePath);
 
                 const newProgress = Math.round((fileStatus.size / expectedFileSize) * 100);
                 updateDownload(downloadId, {
@@ -264,7 +265,7 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
 
             if (isZip && shouldUnzipFiles) {
                 console.log(`Unzipping file: ${tempFilePath}`);
-                const unzipPath = FileSystem.cacheDirectory + `/${download.romFile.file_name.replace('.zip', '')}` || '';
+                const unzipPath = FileSystem.documentDirectory + `${download.romFile.file_name.replace('.zip', '')}` || '';
 
                 updateDownload(downloadId, {
                     status: DownloadStatus.EXTRACTING,
@@ -279,38 +280,48 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
                     });
                 })
 
-                const unzipedFile = await unzip(tempFilePath, unzipPath);
-                console.log(`Unzipped to: ${unzipedFile}`);
+                // Here we use different methods based on platform
+                if (Platform.OS === 'android') {
+                    const unzipedFile = await unzip(tempFilePath, unzipPath);
+                    console.log(`Unzipped to: ${unzipedFile}`);
 
-                zipProgressSubscription.remove();
+                    zipProgressSubscription.remove();
 
-                updateDownload(downloadId, {
-                    status: DownloadStatus.MOVING,
-                    progress: 0,
-                    endTime: new Date(),
-                });
+                    updateDownload(downloadId, {
+                        status: DownloadStatus.MOVING,
+                        progress: 0,
+                        endTime: new Date(),
+                    });
 
-                // List files
-                const files = await ReactNativeBlobUtil.fs.ls(unzipPath);
-                console.log('Unzipped files to:', unzipPath);
+                    // List files
+                    const files = await ReactNativeBlobUtil.fs.ls(unzipPath);
 
-                // Remove the original zip file
-                await unlink(tempFilePath);
-            
-                // Move every file in the unzipped folder to the platform folder
-                for (const file of files) {
-                    const sourcePath = `${unzipPath}/${file}`;
-                    const destinationPath = `${download.platformFolder.folderUri}/${file}`;
-                    console.log(`Moving file from ${sourcePath} to ${destinationPath}`);
-                    try {
-                        const fileStatus = await stat(sourcePath);
-                        updateDownloadProgress(destinationPath, fileStatus.size);
-                        await moveFile(sourcePath, destinationPath, { replaceIfDestinationExists: true });
-                    } catch (_) {}
+                    console.log('Unzipped files to:', unzipPath);
+
+                    // Remove the original zip file
+                    await unlink(tempFilePath);
+                
+                    // Move every file in the unzipped folder to the platform folder
+                    for (const file of files) {
+                        const sourcePath = `${unzipPath}/${file}`;
+                        var destinationPath = `${download.platformFolder.folderUri}/${file}`;
+                        console.log(`Moving file from ${sourcePath} to ${destinationPath}`);
+                        try {
+                            const fileStatus = await ReactNativeBlobUtil.fs.stat(sourcePath);
+                            updateDownloadProgress(destinationPath, fileStatus.size);
+                            await moveFile(sourcePath, destinationPath, { replaceIfDestinationExists: true });
+                        } catch (_) {}
+                    }
+
+                    // Remove the unzipped folder
+                    await unlink(unzipPath);
                 }
-
-                // Remove the unzipped folder
-                await unlink(unzipPath);
+                else {
+                    // Unzip directly into the platform folder
+                    const unzipedFile = await unzip(tempFilePath, download.platformFolder.folderUri);
+                    console.log(`Unzipped directly to: ${unzipedFile}`);
+                    zipProgressSubscription.remove();
+                }
 
             } else {
                 updateDownload(downloadId, {
@@ -323,10 +334,25 @@ export const DownloadProvider: React.FC<DownloadProviderProps> = ({ children }) 
                 // Seems to give an error despite actually moving the file correctly, just ignore the error
                 try {
                     const sourcePath = download.platformFolder.folderUri + '/' + download.romFile.file_name;
-                    const fileStatus = await stat(tempFilePath);
-                    await updateDownloadProgress(sourcePath, fileStatus.size);
-                    await moveFile(tempFilePath, download.platformFolder.folderUri + '/' + download.romFile.file_name, { replaceIfDestinationExists: true });
-                } catch (_) {}
+                    
+                    if(Platform.OS === 'android') {
+                        const fileStatus = await stat(tempFilePath);
+                        await updateDownloadProgress(sourcePath, fileStatus.size);
+                        await moveFile(tempFilePath, sourcePath, { replaceIfDestinationExists: true });
+                    } else {
+                        console.log('Moving file from', tempFilePath, 'to', sourcePath);
+                        // const fileStatus = await FileSystem.getInfoAsync(tempFilePath);
+                        await updateDownloadProgress(sourcePath, 0);
+                        //console.log('File status:', fileStatus);
+                        await FileSystem.moveAsync({
+                            from: tempFilePath,
+                            to: sourcePath,
+                        });
+
+                    }
+                } catch (e) {
+                    console.warn('Error moving file:', e);
+                }
             }
 
             

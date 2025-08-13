@@ -1,5 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as SAF from '@joplin/react-native-saf-x';
+import * as FileSystem from 'expo-file-system';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -8,6 +10,7 @@ import {
     FlatList,
     Image,
     Modal,
+    Platform as RNPlatform,
     ScrollView,
     StyleSheet,
     Text,
@@ -22,6 +25,7 @@ import { useRomDownload } from '../../hooks/useRomDownload';
 import { useRomFileSystem } from '../../hooks/useRomFileSystem';
 import { useTranslation } from '../../hooks/useTranslation';
 import { apiClient, Platform, Rom } from '../../services/api';
+
 
 export default function GameDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -160,11 +164,17 @@ export default function GameDetailsScreen() {
             }
 
             console.log('Platform folder found:', platformFolder.folderUri);
+            var files
 
-            const files = await SAF.listFiles(platformFolder.folderUri);
+            if (RNPlatform.OS === 'android') {
+                files = (await SAF.listFiles(platformFolder.folderUri)).map(file => file.name);
+            } else {
+                // For iOS, use expo-file-system
+                files = await FileSystem.readDirectoryAsync(platformFolder.folderUri);
+            }
             const fileNameWithoutExtension = selectedFile.file_name.replace(/\.[^/.]+$/, '');
             // Check if the ROM file exists in the platform folder
-            const romExists = files.some(file => file.name.replace(/\.[^/.]+$/, '') === fileNameWithoutExtension);
+            const romExists = files.some(file => file.replace(/\.[^/.]+$/, '') === fileNameWithoutExtension);
             
             if (romExists) {
                 setExistingFilePath(platformFolder.folderUri + '/' + fileNameWithoutExtension);
@@ -239,13 +249,26 @@ export default function GameDetailsScreen() {
                                 throw new Error(t('platformFolderNotFound'));
                             }
 
-                            const fileList = await SAF.listFiles(platformFolder.folderUri);
+                            var fileList;
 
-                            const romFile = fileList.find(file => file.name.replace(/\.[^/.]+$/, '') === fileNameWithoutExtension);
+                            if (RNPlatform.OS === 'android') {
+                                fileList = (await SAF.listFiles(platformFolder.folderUri)).map(file => file.name);
+                            } else {
+                                // For iOS, use expo-file-system
+                                fileList = await FileSystem.readDirectoryAsync(platformFolder.folderUri);
+                            }
+
+                            console.log('File list in platform folder:', fileList);
+
+                            const romFile = fileList.find(file => file.replace(/\.[^/.]+$/, '') === fileNameWithoutExtension);
                             if (romFile) {
-                                await SAF.unlink(
-                                    romFile.uri
-                                );
+                                console.log('Deleting file:', platformFolder.folderUri + '/' + romFile);
+                               
+                                if (RNPlatform.OS === 'android') {
+                                    await SAF.unlink(platformFolder.folderUri + '/' + romFile);
+                                } else {
+                                    await FileSystem.deleteAsync(platformFolder.folderUri + '/' + romFile);
+                                }
 
                                 // Update the state to reflect that the file is no longer downloaded
                                 setExistingFilePath(null);

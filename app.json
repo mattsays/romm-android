@@ -59,7 +59,11 @@
       }
     },
     "ios": {
-      "bundleIdentifier": "io.github.mattsays.rommandroid"
+      "bundleIdentifier": "io.github.mattsays.rommandroid",
+      "supportsTablet": true,
+      "infoPlist": {
+        "UISupportsDocumentBrowser": true
+      }
     }
   }
 }
