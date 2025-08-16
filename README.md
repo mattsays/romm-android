@@ -1,7 +1,7 @@
-# RomM Android
+# RomM Mobile
 
 <div align="center">
-  <img src="./assets/images/icon.png" alt="RomM Android Logo" width="128" height="128" />
+  <img src="./assets/images/icon.png" alt="RomM Mobile Logo" width="128" height="128" />
   
   <p><strong>A React Native companion app for RomM - ROM Management made easy</strong></p>
   
@@ -12,7 +12,9 @@
 
 ## 📱 About
 
-RomM Android is a mobile companion app for [RomM](https://github.com/rommapp/romm), a beautiful, powerful, self-hosted ROM manager. This app allows you to browse, manage, and organize your retro gaming collection directly from your Android device.
+RomM Mobile is a mobile companion app for [RomM](https://github.com/rommapp/romm), a beautiful, powerful, self-hosted ROM manager. This app allows you to browse, manage, and organize your retro gaming collection directly from your Android and iOS devices.
+
+> **🧪 iOS Support**: iOS support is currently experimental. While core functionality works, some features may have limitations compared to the Android version.
 
 ### ✨ Features
 
@@ -20,6 +22,7 @@ RomM Android is a mobile companion app for [RomM](https://github.com/rommapp/rom
 - 🔐 **Secure Authentication**: Login with your RomM server credentials
 - 📱 **Retrohandled-Optimized Interface**: Beautiful, responsive design built for retrohandleds
 - 📁 **File Management**: Download and manage ROM files on your device
+- 🍎 **Cross-Platform**: Available for both Android and iOS devices (iOS experimental)
 
 ## 📸 Screenshots
 
@@ -48,13 +51,34 @@ RomM Android is a mobile companion app for [RomM](https://github.com/rommapp/rom
 ## 🚀 Getting Started
 
 ### Installation
-1. **Download the APK**: Get the latest release from the [Releases page](https://github.com/mattsays/romm-android/releases)
+
+#### Android
+1. **Download the APK**: Get the latest release from the [Releases page](https://github.com/mattsays/romm-mobile/releases)
 2. **Install the APK**: Enable installation from unknown sources in your Android settings, then install the downloaded APK
-3. **Open the App**: Launch RomM Android and log in with your RomM server credentials.
+3. **Open the App**: Launch RomM Mobile and log in with your RomM server credentials
+
+#### iOS (Experimental)
+> **Note**: iOS support is experimental and requires sideloading. Apple Developer Account or jailbreak may be required for some methods.
+
+1. **Download the IPA**: Get the latest iOS release from the [Releases page](https://github.com/mattsays/romm-mobile/releases)
+2. **Sideload the IPA**: Use one of the following methods:
+   - **[Sideloadly](https://sideloadly.io/)** (Recommended): Free tool for sideloading IPAs to iOS devices
+   - **[AltStore](https://altstore.io/)**: Alternative sideloading solution
+   - **Xcode**: If you have a Mac and developer account
+3. **Trust the Developer**: Go to Settings → General → VPN & Device Management → Trust the developer certificate
+4. **Open the App**: Launch RomM and log in with your RomM server credentials
+
+#### Sideloadly Setup (Recommended for iOS)
+1. Download and install [Sideloadly](https://sideloadly.io/) on your computer
+2. Connect your iOS device via USB
+3. Drag the downloaded IPA file into Sideloadly
+4. Enter your Apple ID credentials (free account works)
+5. Click "Start" to install the app
+6. Trust the developer certificate on your device as described above
 
 ## 📁 How To - Folder Management
 
-RomM Android uses a sophisticated folder management system that allows you to organize your ROM files efficiently. Here's how it works:
+RomM Mobile uses a sophisticated folder management system that allows you to organize your ROM files efficiently. Here's how it works:
 
 ### Overview
 
@@ -121,6 +145,7 @@ The folder selection dialog shows:
 - [Node.js](https://nodejs.org/) (version 18 or higher)
 - [Expo CLI](https://docs.expo.dev/get-started/installation/)
 - Android Studio (for Android development)
+- Xcode (for iOS development - macOS only)
 - A running [RomM server](https://github.com/rommapp/romm)
 
 ### Installation
@@ -129,7 +154,7 @@ The folder selection dialog shows:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/mattsays/romm-android.git
+   git clone https://github.com/mattsays/romm-mobile.git
    cd romm-android
    ```
 
@@ -146,6 +171,11 @@ The folder selection dialog shows:
 4. **Run on Android**
    ```bash
    npm run android
+   ```
+
+5. **Run on iOS** (macOS only)
+   ```bash
+   npm run ios
    ```
 
 ### Project Structure
@@ -168,6 +198,7 @@ romm-android/
 
 - `npm start` - Start the Expo development server
 - `npm run android` - Run on Android device/emulator
+- `npm run ios` - Run on iOS device/simulator (macOS only)
 
 ### Technology Stack
 
@@ -182,12 +213,28 @@ romm-android/
 
 ## 📋 Requirements
 
-### Android Permissions
+### Device Compatibility
 
+#### Android
+- Android 7.0 (API level 24) or higher
+- ARM64 or x86_64 architecture
+
+#### iOS (Experimental)
+- iOS 13.0 or higher
+- iPhone 6s or newer, iPad Air 2 or newer
+- Sideloading capability (Sideloadly, AltStore, or Developer Account)
+
+### Permissions
+
+#### Android Permissions
 The app requires the following permissions:
 - `READ_EXTERNAL_STORAGE` - Access ROM files
 - `WRITE_EXTERNAL_STORAGE` - Download and save ROMs
 - `INTERNET` - Connect to RomM server
+
+#### iOS Permissions
+- Storage access for downloading ROMs
+- Network access for RomM server connection
 
 ### RomM Server Compatibility
 
@@ -207,8 +254,9 @@ We welcome contributions! Please feel free to submit a Pull Request. For major c
 
 1. Follow the existing code style and TypeScript patterns
 2. Add appropriate types for all new code
-3. Test your changes on both Android devices and emulators
+3. Test your changes on both Android and iOS devices/emulators
 4. Update documentation as needed
+5. Note any platform-specific limitations or differences
 
 ## 📄 License
 
@@ -221,9 +269,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/mattsays/romm-android/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/mattsays/romm-android/discussions)
-- 📖 **Documentation**: [Wiki](https://github.com/mattsays/romm-android/wiki)
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/mattsays/romm-mobile/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/mattsays/romm-mobile/discussions)
+- 📖 **Documentation**: [Wiki](https://github.com/mattsays/romm-mobile/wiki)
 
 ## 🙏 Acknowledgments
 
