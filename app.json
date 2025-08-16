@@ -12,7 +12,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
+      "edgeToEdgeEnabled": false,
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -20,6 +20,13 @@
         "android.permission.INTERNET"
       ],
       "package": "io.github.mattsays.rommandroid"
+    },
+    "ios": {
+      "bundleIdentifier": "io.github.mattsays.rommandroid",
+      "supportsTablet": true,
+      "infoPlist": {
+        "UISupportsDocumentBrowser": true
+      }
     },
     "plugins": [
       "expo-router",
@@ -57,13 +64,6 @@
       "router": {},
       "eas": {
         "projectId": "de44a04b-3068-4e9f-9474-7e9c3f73fbd9"
-      }
-    },
-    "ios": {
-      "bundleIdentifier": "io.github.mattsays.rommandroid",
-      "supportsTablet": true,
-      "infoPlist": {
-        "UISupportsDocumentBrowser": true
       }
     }
   }

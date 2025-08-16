@@ -1,0 +1,197 @@
+name: Build IPA
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      build_profile:
+        description: 'Build Profile'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+
+jobs:
+  build:
+    name: 📱 EAS Build iOS
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      actions: read
+    
+    env:
+      # Optimize Node.js builds
+      NODE_OPTIONS: "--max-old-space-size=4096"
+      # Enable build cache
+      EAS_BUILD_AUTOCOMMIT: "1"
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 🍎 Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: 📋 Cache npm packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
+      - name: 📦 Install dependencies
+        run: |
+          # Check if node_modules is cached and up to date
+          if [ -d "node_modules" ] && [ -f "package-lock.json" ]; then
+            echo "📋 Checking if dependencies are up to date..."
+            npm ls --depth=0 > /dev/null 2>&1 && {
+              echo "✅ Dependencies are up to date, skipping install"
+              exit 0
+            } || echo "🔄 Dependencies need update, proceeding with install..."
+          fi
+          
+          echo "📦 Installing dependencies..."
+          npm ci --prefer-offline --no-audit
+
+      - name: 📋 Cache Expo CLI
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm/_npx
+            ~/.cache/yarn
+            ~/.expo
+          key: expo-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}
+          restore-keys: |
+            expo-${{ runner.os }}-
+
+      - name: 📋 Cache EAS Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.eas
+            ./.eas-build-cache
+          key: eas-build-${{ runner.os }}-${{ hashFiles('**/eas.json', '**/app.json', '**/package.json') }}
+          restore-keys: |
+            eas-build-${{ runner.os }}-
+
+      - name: 🏗️ Setup Expo
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 📋 Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData
+            ./ios/build
+            ./.expo
+            ./dist
+          key: build-artifacts-${{ runner.os }}-${{ hashFiles('**/package.json', '**/app.json', '**/eas.json', 'app/**/*.tsx', 'app/**/*.ts', 'components/**/*.tsx', 'hooks/**/*.ts', 'services/**/*.ts') }}
+          restore-keys: |
+            build-artifacts-${{ runner.os }}-
+
+      - name: 🚀 Build IPA
+        run: |
+          
+          # Determine build profile
+          if [ "${{ github.event_name }}" = "release" ]; then
+            PROFILE="production"
+            echo "🎯 Building PRODUCTION build for release"
+          else
+            PROFILE="${{ inputs.build_profile || 'preview' }}"
+            echo "🎯 Building $PROFILE build (manual trigger)"
+          fi
+
+          # Run the build
+          eas build \
+            --platform ios \
+            --profile $PROFILE \
+            --local \
+            --non-interactive \
+            --clear-cache
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 🔍 Locate IPA
+        id: locate-ipa
+        run: |
+          
+          echo "🔍 Searching for IPA files..."
+          
+          # Search in common locations
+          IPA_FILES=$(find . -name "*.ipa" -type f 2>/dev/null || true)
+          
+          if [ -z "$IPA_FILES" ]; then
+            echo "❌ No IPA files found"
+            echo "📂 Directory structure:"
+            find . -type d -name "*build*" -o -name "*output*" -o -name "*dist*" -o -name "*archive*" | head -20
+            echo "📂 Current directory contents:"
+            ls -la
+            exit 1
+          fi
+          
+          # Get the first IPA file
+          IPA_PATH=$(echo "$IPA_FILES" | head -1)
+          
+          # Create descriptive filename
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          if [ "${{ github.event_name }}" = "release" ]; then
+            NEW_NAME="rommandroid-${{ github.ref_name }}.ipa"
+          else
+            NEW_NAME="rommandroid-${TIMESTAMP}.ipa"
+          fi
+          
+          # Move and rename
+          mv "$IPA_PATH" "$NEW_NAME"
+          
+          # Output for next steps
+          echo "ipa_path=$NEW_NAME" >> $GITHUB_OUTPUT
+          echo "ipa_name=$NEW_NAME" >> $GITHUB_OUTPUT
+          
+          # Show file info
+          echo "✅ IPA ready: $NEW_NAME"
+          ls -lh "$NEW_NAME"
+
+      - name: 📤 Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.locate-ipa.outputs.ipa_name }}
+          path: ${{ steps.locate-ipa.outputs.ipa_path }}
+          retention-days: 30
+
+      - name: 🏷️ Attach IPA to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.locate-ipa.outputs.ipa_path }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ✅ Build complete
+        run: |
+          echo "🎉 Build completed successfully!"
+          echo "📱 IPA: ${{ steps.locate-ipa.outputs.ipa_name }}"
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "🚀 IPA attached to release: ${{ github.ref_name }}"
+          else
+            echo "📦 IPA available in workflow artifacts"
+          fi
