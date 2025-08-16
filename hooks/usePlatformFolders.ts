@@ -4,6 +4,7 @@ import * as SAF from '@joplin/react-native-saf-x';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 import { useStorageAccessFramework } from './useStorageAccessFramework';
+import * as Application from 'expo-application';
 
 import { Platform } from '@/services/api';
 import * as FileSystem from 'expo-file-system';
@@ -47,7 +48,7 @@ export const usePlatformFolders = () => {
                 platformSlug,
                 platformName,
                 folderUri,
-                folderName
+                folderName: folderName || platformName
             };
 
             await AsyncStorage.setItem(`${STORAGE_KEY}_${platformSlug}`, JSON.stringify(newFolder));
@@ -87,7 +88,8 @@ export const usePlatformFolders = () => {
             }
 
             const folderUri = `${baseFolder}${platformSlug}/`;
-
+            console.log('Creating platform folder at:', folderUri);
+            console.log('Base folder:', baseFolder);
             // Create folder using platform-specific methods
             if (RNPlatform.OS === 'android') {
                 const folderRes = await SAF.mkdir(folderUri);
@@ -104,7 +106,7 @@ export const usePlatformFolders = () => {
                 await FileSystem.makeDirectoryAsync(folderUri, { intermediates: true });
             }
 
-            const folderName = extractFolderNameFromUri(folderUri);
+            const folderName = extractFolderNameFromUri(folderUri) || platformSlug;
             const newFolder: PlatformFolder = {
                 platformSlug,
                 platformName: folderName,
@@ -209,19 +211,19 @@ export const usePlatformFolders = () => {
     };
 
     // Function to extract folder name from URI
-    const extractFolderNameFromUri = (uri: string): string => {
+    const extractFolderNameFromUri = (uri: string): string | undefined => {
         try {
             const decodedUri = decodeURIComponent(uri);
             const parts = decodedUri.split('/');
             const lastPart = parts[parts.length - 1];
 
             if (lastPart.includes('%3A')) {
-                return lastPart.split('%3A').pop() || 'Selected Folder';
+                return lastPart.split('%3A').pop() || undefined;
             }
 
-            return lastPart || 'Selected Folder';
+            return lastPart || undefined;
         } catch (error) {
-            return 'Selected Folder';
+            return undefined;
         }
     };
 
@@ -272,7 +274,7 @@ export const usePlatformFolders = () => {
 
                             for (const fileName of files) {
                                 if (fileName === platform.slug) {
-                                    const platformFolderUri = `${baseFolder}/${fileName}`;
+                                    const platformFolderUri = `${baseFolder}${fileName}`;
                                     const fileInfo = await FileSystem.getInfoAsync(platformFolderUri);
 
                                     if (fileInfo.exists && fileInfo.isDirectory) {
@@ -310,8 +312,6 @@ export const usePlatformFolders = () => {
                 try {
                     const documentsDir = FileSystem.documentDirectory;
                     if (documentsDir) {
-                        const baseFolder = await getBaseFolder();
-
                         const savedFolder = await createPlatformFolder(platform.slug);
                         if (savedFolder) {
                             showSuccessToast(
@@ -412,6 +412,26 @@ export const usePlatformFolders = () => {
         return !!baseFolder;
     };
 
+    const canAccessBaseFolder = async (): Promise<boolean> => {
+        const baseFolder = await getBaseFolder();
+        if (!baseFolder) {
+            return false;
+        }
+
+        if (RNPlatform.OS === 'ios') {
+            // For iOS, check if the base folder is the document directory
+            return FileSystem.documentDirectory! === baseFolder; 
+        }
+
+        try {
+            await checkDirectoryPermissions(baseFolder);       
+            return true;
+        } catch (error) {
+            return false;
+        }
+
+    };
+
     // Function to remove the base folder
     const removeBaseFolder = async (): Promise<void> => {
         try {
@@ -439,6 +459,7 @@ export const usePlatformFolders = () => {
         setBaseFolder,
         getBaseFolder,
         hasBaseFolder,
+        canAccessBaseFolder,
         removeBaseFolder,
     };
 };

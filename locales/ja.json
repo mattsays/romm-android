@@ -115,6 +115,7 @@
     "romAlreadyExists": "ROM「{{name}}」はすでにダウンロード済みです",
     "redownload": "再ダウンロード",
     "verify": "検証",
+    "play": "プレイ",
     "confirmDeletion": "削除の確認",
     "confirmDeleteFile": "ファイル「{{fileName}}」を削除してもよろしいですか？\n\nこの操作は元に戻せません。",
     "noFileToDelete": "削除するファイルが見つかりません",

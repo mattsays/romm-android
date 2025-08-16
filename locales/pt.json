@@ -115,6 +115,7 @@
     "romAlreadyExists": "ROM \"{{name}}\" já foi baixada",
     "redownload": "Baixar novamente",
     "verify": "Verificar",
+    "play": "Jogar",
     "confirmDeletion": "Confirmar exclusão",
     "confirmDeleteFile": "Tem certeza de que deseja deletar o arquivo \"{{fileName}}\"?\n\nEsta ação não pode ser desfeita.",
     "noFileToDelete": "Nenhum arquivo para deletar encontrado",

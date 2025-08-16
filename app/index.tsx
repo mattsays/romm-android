@@ -29,9 +29,11 @@ import { useCollections } from '../hooks/useCollections';
 import { usePlatformFolders } from '../hooks/usePlatformFolders';
 import { useRomFileSystem } from '../hooks/useRomFileSystem';
 import { usePlatforms, useRoms } from '../hooks/useRoms';
+import { useStorageAccessFramework } from '../hooks/useStorageAccessFramework';
 import { useTranslation } from '../hooks/useTranslation';
 import { apiClient, Platform as ApiPlatform, Collection, CollectionType, Rom } from '../services/api';
 import { updateService } from '../services/updateService';
+import * as FileSystem from 'expo-file-system';
 
 const { width } = Dimensions.get('window');
 
@@ -47,7 +49,8 @@ export default function LibraryScreen() {
     const [recentRomsLoading, setRecentRomsLoading] = useState(false);
     const { activeDownloads, isRomDownloading, completedDownloads } = useDownload();
     const { downloadRom } = useRomDownload();
-    const { searchPlatformFolder, hasBaseFolder } = usePlatformFolders();
+    const { searchPlatformFolder, hasBaseFolder, canAccessBaseFolder, setBaseFolder, removeAllPlatformFolders } = usePlatformFolders();
+    const { requestDirectoryPermissions } = useStorageAccessFramework();
     const { resetRomsCheck, refreshRomCheck, isRomDownloaded, isCheckingRom } = useRomFileSystem();
     const insets = useSafeAreaInsets();
     const [showBaseFolderModal, setShowBaseFolderModal] = useState(false);
@@ -115,9 +118,20 @@ export default function LibraryScreen() {
         const checkBaseFolderRequired = async () => {
             if (isAuthenticated && !baseFolderChecked) {
                 try {
-                    const hasFolder = await hasBaseFolder();
-                    if (!hasFolder) {
-                        setShowBaseFolderModal(true);
+                    const canAccessBase = await canAccessBaseFolder();
+                    if (!canAccessBase) {
+                        if(Platform.OS === 'android') {
+                            setShowBaseFolderModal(true);
+                        }
+                        else {
+                            // Create automatically base folder for iOS
+                            const folderUri = await requestDirectoryPermissions();
+
+                            if (folderUri) {
+                                await removeAllPlatformFolders();
+                                await setBaseFolder(folderUri);
+                            }
+                        }
                     }
                 } catch (error) {
                     console.error('Error checking base folder:', error);
@@ -128,7 +142,7 @@ export default function LibraryScreen() {
         };
 
         checkBaseFolderRequired();
-    }, [isAuthenticated, baseFolderChecked, hasBaseFolder]);
+    }, [FileSystem.documentDirectory, canAccessBaseFolder]);
 
     // // Check filesystem for existing ROMs when recently added ROMs are loaded
     // useEffect(() => {

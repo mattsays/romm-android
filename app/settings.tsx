@@ -401,7 +401,7 @@ export default function SettingsScreen() {
                 </View>
 
                 {/* Base Folder Section */}
-                <View style={styles.section}>
+                {Platform.OS === 'android' && <View style={styles.section}>
                     <Text style={styles.sectionTitle}>{t('baseFolder')}</Text>
                     <Text style={styles.sectionDescription}>
                         {t('baseFolderDescription')}
@@ -438,10 +438,10 @@ export default function SettingsScreen() {
                             <Text style={styles.buttonText}>{t('selectBaseFolder')}</Text>
                         </TouchableOpacity>
                     )}
-                </View>
+                </View>}
 
                 {/* Platform Folders Section */}
-                <View style={styles.section}>
+                {Platform.OS === 'android' && <View style={styles.section}>
                     <Text style={styles.sectionTitle}>{t('platformFolders')}</Text>
                     <Text style={styles.sectionDescription}>
                         {t('platformFoldersDescription')}
@@ -502,7 +502,7 @@ export default function SettingsScreen() {
                         </View>
                     )}
 
-                </View>
+                </View>}
 
                 {/* Download Settings Section */}
                 <View style={styles.section}>
@@ -544,7 +544,7 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                App Update Section
+                {/* App Update Section */}
                 {Platform.OS === 'android' && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>{t('appUpdate')}</Text>
