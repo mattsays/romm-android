@@ -7,6 +7,7 @@ import {
     Alert,
     FlatList,
     Image,
+    Platform,
     Pressable,
     RefreshControl,
     StyleSheet,
@@ -76,6 +77,7 @@ export default function PlatformScreen() {
                 const platformFolder = await searchPlatformFolder(currentPlatform);
                 if (!platformFolder) {
                     setFolderSelectionShown(true);
+                    console.log('Platform folder not found, requesting folder selection');
                     await requestPlatformFolder(currentPlatform);
                 }
             };
@@ -367,12 +369,12 @@ export default function PlatformScreen() {
                         </Text>
                     </View>
                     <View style={styles.headerButtons}>
-                        <TouchableOpacity
+                        {Platform.OS === 'android' && <TouchableOpacity
                             style={styles.folderButton}
                             onPress={() => requestPlatformFolder(currentPlatform, true)}
                         >
                             <Ionicons name="folder-outline" size={20} color="#fff" />
-                        </TouchableOpacity>
+                        </TouchableOpacity>}
                         <TouchableOpacity
                             style={[
                                 styles.downloadAllButton,

@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { PlatformFolder } from '../hooks/usePlatformFolders';
 import { apiClient, Rom } from './api';
@@ -158,8 +159,13 @@ class DownloadService {
                 download.rom.name || download.rom.fs_name
             );
 
-            // Get the download URL from the API
-            const downloadUrl = await apiClient.obtainDownloadLink(download.rom);
+            // Get the download URL from the API using the first ROM file
+            if (!download.rom.files || download.rom.files.length === 0) {
+                throw new Error('No files found for this ROM');
+            }
+
+            const romFile = download.rom.files[0]; // Use the first file
+            const downloadUrl = await apiClient.obtainDownloadLink(romFile);
             const fileName = download.rom.fs_name;
             const tempFilePath = FileSystem.cacheDirectory + fileName;
 
@@ -222,18 +228,31 @@ class DownloadService {
         if (!download) return;
 
         try {
-            // Create the file in the platform folder using Storage Access Framework
-            const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
-                download.platformFolder.folderUri,
-                download.rom.fs_name,
-                'application/octet-stream'
-            );
+            let fileUri: string;
 
-            // Copy the file to the destination
-            await ReactNativeBlobUtil.MediaCollection.writeToMediafile(
-                fileUri,
-                tempFilePath
-            );
+            if (Platform.OS === 'android') {
+                // Use Storage Access Framework for Android
+                fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+                    download.platformFolder.folderUri,
+                    download.rom.fs_name,
+                    'application/octet-stream'
+                );
+
+                // Copy the file to the destination using ReactNativeBlobUtil for Android
+                await ReactNativeBlobUtil.MediaCollection.writeToMediafile(
+                    fileUri,
+                    tempFilePath
+                );
+            } else {
+                // For iOS, use expo-file-system directly
+                fileUri = `${download.platformFolder.folderUri}${download.rom.fs_name}`;
+
+                // Copy the file to the destination
+                await FileSystem.copyAsync({
+                    from: tempFilePath,
+                    to: fileUri,
+                });
+            }
 
             // Delete the temporary file
             await FileSystem.deleteAsync(tempFilePath, { idempotent: true });

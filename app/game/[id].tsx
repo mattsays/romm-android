@@ -1,9 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as SAF from '@joplin/react-native-saf-x';
-import RNFetchBlob from "react-native-blob-util";
-import * as IntentLauncher from 'expo-intent-launcher';
-import { Linking } from 'react-native';
-import * as RNFS from 'react-native-fs';
 import * as FileSystem from 'expo-file-system';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -13,12 +9,12 @@ import {
     FlatList,
     Image,
     Modal,
+    Platform as RNPlatform,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
-    PermissionsAndroid
+    View
 } from 'react-native';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
 import { useDownload } from '../../contexts/DownloadContext';
@@ -202,12 +198,17 @@ export default function GameDetailsScreen() {
             }
 
             console.log('Platform folder found:', platformFolder.folderUri);
+            var files
 
-            const files = await SAF.listFiles(platformFolder.folderUri);
+            if (RNPlatform.OS === 'android') {
+                files = (await SAF.listFiles(platformFolder.folderUri)).map(file => file.name);
+            } else {
+                // For iOS, use expo-file-system
+                files = await FileSystem.readDirectoryAsync(platformFolder.folderUri);
+            }
             const fileNameWithoutExtension = selectedFile.file_name.replace(/\.[^/.]+$/, '');
             // Check if the ROM file exists in the platform folder
-            const romExists = files.some(file => file.name.replace(/\.[^/.]+$/, '') === fileNameWithoutExtension);
-
+            const romExists = files.some(file => file.replace(/\.[^/.]+$/, '') === fileNameWithoutExtension);
             if (romExists) {
                 setExistingFilePath(platformFolder.folderUri + '/' + fileNameWithoutExtension);
                 return;
@@ -281,13 +282,26 @@ export default function GameDetailsScreen() {
                                 throw new Error(t('platformFolderNotFound'));
                             }
 
-                            const fileList = await SAF.listFiles(platformFolder.folderUri);
+                            var fileList;
 
-                            const romFile = fileList.find(file => file.name.replace(/\.[^/.]+$/, '') === fileNameWithoutExtension);
+                            if (RNPlatform.OS === 'android') {
+                                fileList = (await SAF.listFiles(platformFolder.folderUri)).map(file => file.name);
+                            } else {
+                                // For iOS, use expo-file-system
+                                fileList = await FileSystem.readDirectoryAsync(platformFolder.folderUri);
+                            }
+
+                            console.log('File list in platform folder:', fileList);
+
+                            const romFile = fileList.find(file => file.replace(/\.[^/.]+$/, '') === fileNameWithoutExtension);
                             if (romFile) {
-                                await SAF.unlink(
-                                    romFile.uri
-                                );
+                                console.log('Deleting file:', platformFolder.folderUri + '/' + romFile);
+
+                                if (RNPlatform.OS === 'android') {
+                                    await SAF.unlink(platformFolder.folderUri + '/' + romFile);
+                                } else {
+                                    await FileSystem.deleteAsync(platformFolder.folderUri + '/' + romFile);
+                                }
 
                                 // Update the state to reflect that the file is no longer downloaded
                                 setExistingFilePath(null);
@@ -462,12 +476,12 @@ export default function GameDetailsScreen() {
                                                 <Text style={styles.alreadyDownloadedTitle}>{t('fileAlreadyDownloaded')}</Text>
                                             </View>
                                             <View style={styles.alreadyDownloadedActions}>
-                                               {EJS_SUPPORTED_PLATFORMS.includes(rom?.platform_slug) && <TouchableOpacity
+                                                {EJS_SUPPORTED_PLATFORMS.includes(rom?.platform_slug) && <TouchableOpacity
                                                     style={[styles.downloadButton, styles.openButton]}
                                                     onPress={() => handleOpenWith(rom)}
                                                 >
-                                                    <Ionicons name="open-outline" size={20} color="#fff" />
-                                                    <Text style={styles.downloadButtonText}>{t('openWith')}</Text>
+                                                    <Ionicons name="play-outline" size={20} color="#fff" />
+                                                    <Text style={styles.downloadButtonText}>{t('play')}</Text>
                                                 </TouchableOpacity>}
                                                 <TouchableOpacity
                                                     style={[styles.downloadButton, styles.redownloadButton]}
@@ -496,43 +510,61 @@ export default function GameDetailsScreen() {
                                     );
                                 } else {
                                     return (
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.downloadButton,
-                                                isCurrentlyDownloading && styles.downloadingButton
-                                            ]}
-                                            onPress={handleDownload}
-                                            disabled={isCurrentlyDownloading}
-                                        >
-                                            {/* Progress bar background when downloading */}
-                                            {isCurrentlyDownloading && (
-                                                <View style={[styles.progressBackground, StyleSheet.absoluteFill]}>
-                                                    <View
-                                                        style={[
-                                                            styles.progressFill,
-                                                            { width: `${downloadProgress * 100}%` }
-                                                        ]}
-                                                    />
-                                                </View>
-                                            )}
+                                        <View style={styles.downloadSection}>
+                                            <View style={styles.buttonsRow}>
+                                                {/* Play button for supported platforms */}
+                                                {EJS_SUPPORTED_PLATFORMS.includes(rom?.platform_slug) && (
+                                                    <TouchableOpacity
+                                                        style={[styles.downloadButton, styles.openButton, styles.playButtonHorizontal]}
+                                                        onPress={() => handleOpenWith(rom)}
+                                                    >
+                                                        <Ionicons name="play-outline" size={20} color="#fff" />
+                                                        <Text style={styles.downloadButtonText}>{t('play')}</Text>
+                                                    </TouchableOpacity>
+                                                )}
 
-                                            {isCurrentlyDownloading ? (
-                                                <View style={styles.downloadingContent}>
-                                                    <ActivityIndicator size="small" color="#fff" />
-                                                    <Text style={styles.downloadButtonText}>
-                                                        {currentDownload ?
-                                                            `${t('downloading')} ${Math.round(downloadProgress * 100)}%` :
-                                                            t('addedToQueue')
-                                                        }
-                                                    </Text>
-                                                </View>
-                                            ) : (
-                                                <View style={styles.downloadContent}>
-                                                    <Ionicons name="download-outline" size={20} color="#fff" />
-                                                    <Text style={styles.downloadButtonText}>{t('downloadRom')}</Text>
-                                                </View>
-                                            )}
-                                        </TouchableOpacity>
+                                                {/* Download button */}
+                                                <TouchableOpacity
+                                                    style={[
+                                                        styles.downloadButton,
+                                                        styles.downloadButtonHorizontal,
+                                                        isCurrentlyDownloading && styles.downloadingButton,
+                                                        !EJS_SUPPORTED_PLATFORMS.includes(rom?.platform_slug) && styles.downloadButtonFullWidth
+                                                    ]}
+                                                    onPress={handleDownload}
+                                                    disabled={isCurrentlyDownloading}
+                                                >
+                                                    {/* Progress bar background when downloading */}
+                                                    {isCurrentlyDownloading && (
+                                                        <View style={[styles.progressBackground, StyleSheet.absoluteFill]}>
+                                                            <View
+                                                                style={[
+                                                                    styles.progressFill,
+                                                                    { width: `${downloadProgress * 100}%` }
+                                                                ]}
+                                                            />
+                                                        </View>
+                                                    )}
+
+                                                    {isCurrentlyDownloading ? (
+                                                        <View style={styles.downloadingContent}>
+                                                            <ActivityIndicator size="small" color="#fff" />
+                                                            <Text style={styles.downloadButtonText}>
+                                                                {currentDownload ?
+                                                                    `${t('downloading')} ${Math.round(downloadProgress * 100)}%` :
+                                                                    t('addedToQueue')
+                                                                }
+                                                            </Text>
+                                                        </View>
+                                                    ) : (
+                                                        <View style={styles.downloadContent}>
+                                                            <Ionicons name="download-outline" size={20} color="#fff" />
+                                                            <Text style={styles.downloadButtonText}>{t('downloadRom')}</Text>
+                                                        </View>
+                                                    )}
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
                                     );
                                 }
                             })()}
@@ -722,6 +754,24 @@ const styles = StyleSheet.create({
         marginTop: 10,
         overflow: 'hidden', // Ensure progress bar stays within button bounds
         position: 'relative', // Allow for absolute positioning of progress bar
+    },
+    downloadSection: {
+        gap: 10,
+    },
+    buttonsRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    playButtonHorizontal: {
+        flex: 0.4,
+        marginTop: 0,
+    },
+    downloadButtonHorizontal: {
+        flex: 0.6,
+        marginTop: 0,
+    },
+    downloadButtonFullWidth: {
+        flex: 1,
     },
     downloadingButton: {
         backgroundColor: '#666',

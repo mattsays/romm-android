@@ -117,6 +117,7 @@
     "romAlreadyExists": "ROM \"{{name}}\" is already downloaded",
     "redownload": "Redownload",
     "verify": "Verify",
+    "play": "Play",
     "openWith": "Open with",
     "openWithApp": "Open with app",
     "errorOpeningFile": "Error opening file",

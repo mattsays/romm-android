@@ -115,6 +115,7 @@
     "romAlreadyExists": "La ROM \"{{name}}\" ya está descargada",
     "redownload": "Volver a descargar",
     "verify": "Verificar",
+    "play": "Jugar",
     "openWith": "Abrir con",
     "openWithApp": "Abrir con aplicación",
     "noAppToOpen": "No hay aplicación disponible para abrir este archivo",

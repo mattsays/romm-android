@@ -93,7 +93,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setIsLoading(true);
 
                 // Wait for the API client to load the token from storage
-                await apiClient.waitForTokenLoad();
+                await apiClient.waitForCredentialsLoad();
 
                 // Check if we have a token and try to get user data
                 if (apiClient.isAuthenticated()) {

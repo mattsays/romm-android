@@ -1,15 +1,17 @@
+import { useToast } from '@/contexts/ToastContext';
+import { useTranslation } from '@/hooks/useTranslation';
 import * as SAF from '@joplin/react-native-saf-x';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 import { useStorageAccessFramework } from './useStorageAccessFramework';
-import { useToast } from '@/contexts/ToastContext';
-import { useTranslation } from '@/hooks/useTranslation';
-import { useRomFileSystem } from '@/hooks/useRomFileSystem';
+import * as Application from 'expo-application';
 
-import {
-    Alert
-} from 'react-native';
 import { Platform } from '@/services/api';
+import * as FileSystem from 'expo-file-system';
+import {
+    Alert,
+    Platform as RNPlatform,
+} from 'react-native';
 
 
 export interface PlatformFolder {
@@ -46,7 +48,7 @@ export const usePlatformFolders = () => {
                 platformSlug,
                 platformName,
                 folderUri,
-                folderName
+                folderName: folderName || platformName
             };
 
             await AsyncStorage.setItem(`${STORAGE_KEY}_${platformSlug}`, JSON.stringify(newFolder));
@@ -78,22 +80,33 @@ export const usePlatformFolders = () => {
         platformSlug: string
     ): Promise<PlatformFolder | null> => {
         try {
-            const baseFolder = await AsyncStorage.getItem(STORAGE_KEY_BASE);
+            let baseFolder = await AsyncStorage.getItem(STORAGE_KEY_BASE);
+
             if (!baseFolder) {
                 console.warn('No base folder configured for platform folders');
                 return null;
             }
-            const folderUri = `${baseFolder}/${platformSlug}`;
 
-            // Create folder using SAF
-            const folderRes = await SAF.mkdir(folderUri);
+            const folderUri = `${baseFolder}${platformSlug}/`;
+            console.log('Creating platform folder at:', folderUri);
+            console.log('Base folder:', baseFolder);
+            // Create folder using platform-specific methods
+            if (RNPlatform.OS === 'android') {
+                const folderRes = await SAF.mkdir(folderUri);
 
-            if (!folderRes) {
-                console.error(`Failed to create folder for platform ${platformSlug}`);
-                return null;
+                if (!folderRes) {
+                    console.error(`Failed to create folder for platform ${platformSlug}`);
+                    return null;
+                }
+            } else {
+                // For iOS, use expo-file-system
+                // First ensure base folder exists
+                await FileSystem.makeDirectoryAsync(baseFolder, { intermediates: true });
+                // Then create platform folder
+                await FileSystem.makeDirectoryAsync(folderUri, { intermediates: true });
             }
 
-            const folderName = extractFolderNameFromUri(folderUri);
+            const folderName = extractFolderNameFromUri(folderUri) || platformSlug;
             const newFolder: PlatformFolder = {
                 platformSlug,
                 platformName: folderName,
@@ -102,6 +115,20 @@ export const usePlatformFolders = () => {
             };
 
             await AsyncStorage.setItem(`${STORAGE_KEY}_${platformSlug}`, JSON.stringify(newFolder));
+
+            // Add to the list of configured platforms
+            const allFolders = await AsyncStorage.getItem(STORAGE_KEY);
+            const folders = allFolders ? JSON.parse(allFolders) : [];
+
+            const existingIndex = folders.findIndex((folder: PlatformFolder) => folder.platformSlug === platformSlug);
+            if (existingIndex !== -1) {
+                folders[existingIndex] = newFolder;
+            } else {
+                folders.push(newFolder);
+            }
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(folders));
+
+            console.log(`Folder for platform ${platformSlug} created successfully:`, newFolder);
             return newFolder;
         } catch (error) {
             console.error(`Error creating folder for platform ${platformSlug}:`, error);
@@ -169,7 +196,14 @@ export const usePlatformFolders = () => {
         }
 
         try {
-            return await checkDirectoryPermissions(folder.folderUri);
+            if (RNPlatform.OS === 'android') {
+                // Use SAF for Android
+                return await checkDirectoryPermissions(folder.folderUri);
+            } else {
+                // Use expo-file-system for iOS
+                const fileInfo = await FileSystem.getInfoAsync(folder.folderUri);
+                return fileInfo.exists && fileInfo.isDirectory;
+            }
         } catch (error) {
             console.error(`Error checking folder access for platform ${platformSlug}:`, error);
             return false;
@@ -177,19 +211,19 @@ export const usePlatformFolders = () => {
     };
 
     // Function to extract folder name from URI
-    const extractFolderNameFromUri = (uri: string): string => {
+    const extractFolderNameFromUri = (uri: string): string | undefined => {
         try {
             const decodedUri = decodeURIComponent(uri);
             const parts = decodedUri.split('/');
             const lastPart = parts[parts.length - 1];
 
             if (lastPart.includes('%3A')) {
-                return lastPart.split('%3A').pop() || 'Selected Folder';
+                return lastPart.split('%3A').pop() || undefined;
             }
 
-            return lastPart || 'Selected Folder';
+            return lastPart || undefined;
         } catch (error) {
-            return 'Selected Folder';
+            return undefined;
         }
     };
 
@@ -223,10 +257,33 @@ export const usePlatformFolders = () => {
                         return null;
                     }
 
-                    const files = await SAF.listFiles(baseFolder);
-                    for (const file of files) {
-                        if (file.name.toLowerCase() === platform.slug || file.name.toLowerCase() === platform.name.toLowerCase()) {
-                            return await savePlatformFolder(platform.fs_slug, platform.name, file.uri);
+                    if (RNPlatform.OS === 'android') {
+                        // Use SAF for Android
+                        const files = await SAF.listFiles(baseFolder);
+
+                        for (const file of files) {
+                            if (file.name === platform.slug) {
+                                return await savePlatformFolder(platform.fs_slug, platform.name, file.uri);
+                            }
+                        }
+                    } else {
+                        // Use expo-file-system for iOS
+                        try {
+                            const files = await FileSystem.readDirectoryAsync(baseFolder);
+                            console.log('Files in base folder:', files);
+
+                            for (const fileName of files) {
+                                if (fileName === platform.slug) {
+                                    const platformFolderUri = `${baseFolder}${fileName}`;
+                                    const fileInfo = await FileSystem.getInfoAsync(platformFolderUri);
+
+                                    if (fileInfo.exists && fileInfo.isDirectory) {
+                                        return await savePlatformFolder(platform.fs_slug, platform.name, platformFolderUri);
+                                    }
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error reading iOS directory:', error);
                         }
                     }
                 }
@@ -246,57 +303,84 @@ export const usePlatformFolders = () => {
 
             const currentFolder = await searchPlatformFolder(platform);
 
-            if(currentFolder && !force) {
+            if (currentFolder && !force) {
                 return;
             }
 
-            Alert.alert(
-                t('selectFolderTitle'),
-                t('selectFolderToDownload', { platform: platform.name }),
-                [
-                    {
-                        text: t('notNow'),
-                        style: 'cancel'
-                    },
-                    {
-                        text: t('selectFolder'),
-                        onPress: async () => {
-                            try {
-                                const folderUri = await requestDirectoryPermissions();
-                                if (folderUri) {
-                                    console.log('Selected folder URI:', folderUri);
-                                    const savedFolder = await savePlatformFolder(platform.slug, platform.name, folderUri);
-                                    
-                                    showSuccessToast(
-                                        t('folderConfiguredSuccessfully', { platform: platform.name }),
-                                        t('folderConfigured')
+            if (RNPlatform.OS === 'ios') {
+                // For iOS, try to create the folder automatically in Documents directory
+                try {
+                    const documentsDir = FileSystem.documentDirectory;
+                    if (documentsDir) {
+                        const savedFolder = await createPlatformFolder(platform.slug);
+                        if (savedFolder) {
+                            showSuccessToast(
+                                t('folderConfiguredSuccessfully', { platform: platform.name }),
+                                t('folderConfigured')
+                            );
+                        } else {
+                            showErrorToast(
+                                t('errorCreatingFolder'),
+                                t('error')
+                            );
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error creating iOS folder:', error);
+                    showErrorToast(
+                        t('errorCreatingFolder'),
+                        t('error')
+                    );
+                }
+            } else {
+                // Android flow with SAF permissions
+                Alert.alert(
+                    t('selectFolderTitle'),
+                    t('selectFolderToDownload', { platform: platform.name }),
+                    [
+                        {
+                            text: t('notNow'),
+                            style: 'cancel'
+                        },
+                        {
+                            text: t('selectFolder'),
+                            onPress: async () => {
+                                try {
+                                    const folderUri = await requestDirectoryPermissions();
+                                    if (folderUri) {
+                                        const savedFolder = await savePlatformFolder(platform.slug, platform.name, folderUri);
+
+                                        showSuccessToast(
+                                            t('folderConfiguredSuccessfully', { platform: platform.name }),
+                                            t('folderConfigured')
+                                        );
+                                    }
+                                } catch (error) {
+                                    console.error('Error selecting folder:', error);
+                                    showErrorToast(
+                                        t('errorSelectingFolder'),
+                                        t('error')
                                     );
                                 }
-                            } catch (error) {
-                                console.error('Error selecting folder:', error);
-                                showErrorToast(
-                                    t('errorSelectingFolder'),
-                                    t('error')
-                                );
-                            }
-                        }
-                    },
-                    {
-                        text: t('createFolder'),
-                        onPress: async () => {
-                            try {
-                                await createPlatformFolder(platform.slug);
-                            } catch (error) {
-                                console.error('Error creating folder:', error);
-                                showErrorToast(
-                                    t('errorCreatingFolder'),
-                                    t('error')
-                                );
                             }
                         },
-                    }
-                ]
-            );
+                        {
+                            text: t('createFolder'),
+                            onPress: async () => {
+                                try {
+                                    await createPlatformFolder(platform.slug);
+                                } catch (error) {
+                                    console.error('Error creating folder:', error);
+                                    showErrorToast(
+                                        t('errorCreatingFolder'),
+                                        t('error')
+                                    );
+                                }
+                            },
+                        }
+                    ]
+                );
+            }
         },
         [searchPlatformFolder]
     );
@@ -328,6 +412,26 @@ export const usePlatformFolders = () => {
         return !!baseFolder;
     };
 
+    const canAccessBaseFolder = async (): Promise<boolean> => {
+        const baseFolder = await getBaseFolder();
+        if (!baseFolder) {
+            return false;
+        }
+
+        if (RNPlatform.OS === 'ios') {
+            // For iOS, check if the base folder is the document directory
+            return FileSystem.documentDirectory! === baseFolder; 
+        }
+
+        try {
+            await checkDirectoryPermissions(baseFolder);       
+            return true;
+        } catch (error) {
+            return false;
+        }
+
+    };
+
     // Function to remove the base folder
     const removeBaseFolder = async (): Promise<void> => {
         try {
@@ -355,6 +459,7 @@ export const usePlatformFolders = () => {
         setBaseFolder,
         getBaseFolder,
         hasBaseFolder,
+        canAccessBaseFolder,
         removeBaseFolder,
     };
 };

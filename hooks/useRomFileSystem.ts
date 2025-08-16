@@ -2,7 +2,8 @@ import * as SAF from '@joplin/react-native-saf-x';
 import RNFetchBlob from "react-native-blob-util";
 import * as FileSystem from 'expo-file-system';
 import { useCallback, useMemo, useState } from 'react';
-import { Platform, Rom, RomFile } from '../services/api';
+import { Platform } from 'react-native';
+import { RomFile } from '../services/api';
 import { PlatformFolder, usePlatformFolders } from './usePlatformFolders';
 
 
@@ -32,9 +33,18 @@ export const useRomFileSystem = () => {
 
             const fileNameWithoutExtension = romFile.file_name.replace(/\.[^/.]+$/, '');
 
-            const fileList = await SAF.listFiles(platformFolder.folderUri);
+
+            var fileList;
+
+            if (Platform.OS === 'android') {
+                fileList = (await SAF.listFiles(platformFolder.folderUri)).map(file => file.name);
+            } else {
+                // For iOS, use expo-file-system
+                fileList = await FileSystem.readDirectoryAsync(platformFolder.folderUri);
+            }
+
             // Check if the ROM file exists in the platform folder
-            const romExists = fileList.some(file => file.name.includes(fileNameWithoutExtension));
+            const romExists = fileList.some(file => file.includes(fileNameWithoutExtension));
 
             if (romExists) {
                 console.log('ROM already exists in the folder:', romFile.file_name);
@@ -88,7 +98,7 @@ export const useRomFileSystem = () => {
 
         console.log('Refreshing ROM check for:', romFile.file_name);
 
-        if(fileChecks[romFile.rom_id] == true) {
+        if (fileChecks[romFile.rom_id] == true) {
             // If already checked and exists, return true
             return true;
         }
