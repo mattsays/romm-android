@@ -547,7 +547,7 @@ export default function SettingsScreen() {
                 {/* App Update Section */}
                 {Platform.OS === 'android' && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>{t('appUpdate')}</Text>
+                        <Text style={styles.sectionTitle}>{t('appUpdate') + '[EXPERIMENTAL]'}</Text>
                         <Text style={styles.sectionDescription}>
                             {t('appUpdateDescription')}
                         </Text>
