@@ -2,7 +2,7 @@
   "expo": {
     "name": "RomM",
     "slug": "RomM",
-    "version": "1.0.3",
+    "version": "1.0.5.1",
     "icon": "./assets/images/icon.png",
     "scheme": "rommmobile",
     "userInterfaceStyle": "automatic",
@@ -19,8 +19,8 @@
         "android.permission.REQUEST_INSTALL_PACKAGES",
         "android.permission.INTERNET"
       ],
-      "package": "io.github.mattsays.rommandroid",
-      "versionCode": 1
+      "package": "io.github.mattsays.rommmobile",
+      "versionCode": 51
     },
     "ios": {
       "bundleIdentifier": "io.github.mattsays.rommmobile",
