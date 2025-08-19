@@ -116,6 +116,7 @@
     "redownload": "Baixar novamente",
     "verify": "Verificar",
     "play": "Jogar",
+    "playOnEmuJS": "Jogar no EmuJS",
     "confirmDeletion": "Confirmar exclusão",
     "confirmDeleteFile": "Tem certeza de que deseja deletar o arquivo \"{{fileName}}\"?\n\nEsta ação não pode ser desfeita.",
     "noFileToDelete": "Nenhum arquivo para deletar encontrado",

@@ -116,6 +116,7 @@
     "redownload": "Retélécharger",
     "verify": "Vérifier",
     "play": "Jouer",
+    "playOnEmuJS": "Jouer sur EmuJS",
     "openWith": "Ouvrir avec",
     "openWithApp": "Ouvrir avec une application",
     "noAppToOpen": "Aucune application disponible pour ouvrir ce fichier",

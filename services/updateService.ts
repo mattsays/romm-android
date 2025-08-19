@@ -1,9 +1,10 @@
 import * as FileSystem from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { Platform } from 'react-native';
-import { version } from '../package.json';
+import * as Application from 'expo-application'; 
 
-const GITHUB_API_URL = 'https://api.github.com/repos/mattsays/romm-android/releases/latest';
+
+const GITHUB_API_URL = 'https://api.github.com/repos/mattsays/romm-mobile/releases/latest';
 
 export interface Release {
     tag_name: string;
@@ -28,7 +29,7 @@ class UpdateService {
             const release: Release = await response.json();
 
             // Compare versions
-            if (this.isNewerVersion(release.tag_name, version)) {
+            if (this.isNewerVersion(release.tag_name, Application.nativeApplicationVersion!)) {
                 return release;
             }
             return null;
@@ -76,7 +77,7 @@ class UpdateService {
             console.log('Installing update from:', contentUri);
             const res = await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
                 data: contentUri, // Convert file URI to content URI
-                flags: 0x10000000 | 1, // FLAG_ACTIVITY_NEW_TASK | FLAG_GRANT_READ_URI_PERMISSION
+                flags: 0x04000000 | 1, // FLAG_ACTIVITY_NEW_TASK | FLAG_GRANT_READ_URI_PERMISSION
                 type: 'application/vnd.android.package-archive',
             });
             console.log('Update installation started:', res);
@@ -90,7 +91,17 @@ class UpdateService {
         const latestParts = latest.replace('v', '').split('.').map(Number);
         const currentParts = current.split('.').map(Number);
 
-        for (let i = 0; i < latestParts.length; i++) {
+        console.log('Comparing versions:', latestParts, currentParts);
+
+        for (let i = 0; i < Math.max(latestParts.length, currentParts.length); i++) {
+            if (i >= currentParts.length) {
+                return true; // Latest version has more parts than current
+            }
+
+            if (i >= latestParts.length) {
+                return false; // Current version has more parts than latest
+            }
+
             if (latestParts[i] > (currentParts[i] || 0)) {
                 return true;
             }

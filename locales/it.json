@@ -118,6 +118,7 @@
     "redownload": "Riscarica",
     "verify": "Verifica",
     "play": "Gioca",
+    "playOnEmuJS": "Gioca su EmuJS",
     "openWith": "Apri con",
     "openWithApp": "Apri con app",
     "noAppToOpen": "Nessuna app disponibile per aprire questo file",

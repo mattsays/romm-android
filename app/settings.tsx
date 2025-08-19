@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Application from 'expo-application';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -17,7 +18,6 @@ import { useToast } from '../contexts/ToastContext';
 import { usePlatformFolders } from '../hooks/usePlatformFolders';
 import { useStorageAccessFramework } from '../hooks/useStorageAccessFramework';
 import { useTranslation } from '../hooks/useTranslation';
-import { version } from '../package.json';
 import { Release, updateService } from '../services/updateService';
 
 
@@ -40,6 +40,7 @@ export default function SettingsScreen() {
     const [concurrentDownloads, setConcurrentDownloads] = useState<number>(2);
     const [showConcurrentDownloadsPicker, setShowConcurrentDownloadsPicker] = useState<boolean>(false);
     const [appUpdatesEnabled, setAppUpdatesEnabled] = useState<boolean>(true);
+    const [emuJsEnabled, setEmuJsEnabled] = useState<boolean>(true);
     const [updateAvailable, setUpdateAvailable] = useState<Release | null>(null);
     const [isCheckingForUpdate, setIsCheckingForUpdate] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -332,6 +333,38 @@ export default function SettingsScreen() {
         }
     };
 
+    const loadEmuJsEnabledSetting = async () => {
+        try {
+            const value = await AsyncStorage.getItem('emuJsEnabled');
+            if (value !== null) {
+                setEmuJsEnabled(JSON.parse(value));
+            } else {
+                // Default value is true
+                setEmuJsEnabled(true);
+            }
+        } catch (error) {
+            console.error('Error loading EmuJS setting:', error);
+            setEmuJsEnabled(true); // Default fallback
+        }
+    };
+
+    const saveEmuJsEnabledSetting = async (value: boolean) => {
+        try {
+            await AsyncStorage.setItem('emuJsEnabled', JSON.stringify(value));
+            setEmuJsEnabled(value);
+            showSuccessToast(
+                t('settings') + ' ' + t('success').toLowerCase(),
+                'EmuJS'
+            );
+        } catch (error) {
+            console.error('Error saving EmuJS setting:', error);
+            showErrorToast(
+                t('error'),
+                t('settings')
+            );
+        }
+    };
+
     useEffect(() => {
         // Load configured platforms when the component mounts
         loadPlatformFolders();
@@ -353,6 +386,9 @@ export default function SettingsScreen() {
 
         // Load concurrent downloads setting
         loadConcurrentDownloadsSetting();
+
+        // Load EmuJS enabled setting
+        loadEmuJsEnabledSetting();
 
         // Load app updates enabled setting and check for updates on Android
         const loadAndCheckUpdates = async () => {
@@ -542,12 +578,28 @@ export default function SettingsScreen() {
                             <Ionicons name="chevron-down" size={16} color="#ccc" />
                         </TouchableOpacity>
                     </View>
+
+                    <View style={styles.settingItem}>
+                        <View style={styles.settingInfo}>
+                            <Text style={styles.settingTitle}>Enable EmuJS</Text>
+                            <Text style={styles.settingDescription}>
+                                Enable in-browser ROM emulation using EmuJS
+                            </Text>
+                        </View>
+                        <Switch
+                            value={emuJsEnabled}
+                            onValueChange={saveEmuJsEnabledSetting}
+                            trackColor={{ false: '#3e3e3e', true: '#4CAF50' }}
+                            thumbColor={emuJsEnabled ? '#fff' : '#f4f3f4'}
+                            ios_backgroundColor="#3e3e3e"
+                        />
+                    </View>
                 </View>
 
                 {/* App Update Section */}
                 {Platform.OS === 'android' && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>{t('appUpdate') + '[EXPERIMENTAL]'}</Text>
+                        <Text style={styles.sectionTitle}>{t('appUpdate')}</Text>
                         <Text style={styles.sectionDescription}>
                             {t('appUpdateDescription')}
                         </Text>
@@ -570,7 +622,7 @@ export default function SettingsScreen() {
 
                         <View style={styles.updateContainer}>
                             <View style={styles.versionInfo}>
-                                <Text style={styles.versionText}>{t('currentVersion', { version })}</Text>
+                                <Text style={styles.versionText}>{t('currentVersion', { version: Application.nativeApplicationVersion! })}</Text>
                                 {updateAvailable && (
                                     <View style={styles.updateBadge}>
                                         <Ionicons name="arrow-up-circle" size={16} color="#4CAF50" />
@@ -604,6 +656,19 @@ export default function SettingsScreen() {
                         {isDownloading && (
                             <View style={styles.downloadStatus}>
                                 <Text style={styles.downloadingText}>{t('downloadingUpdate')}</Text>
+                                <View style={styles.progressBarContainer}>
+                                    <View style={styles.progressBarBackground}>
+                                        <View
+                                            style={[
+                                                styles.progressBarFill,
+                                                { width: `${downloadProgress * 100}%` }
+                                            ]}
+                                        />
+                                    </View>
+                                    <Text style={styles.progressText}>
+                                        {Math.round(downloadProgress * 100)}%
+                                    </Text>
+                                </View>
                             </View>
                         )}
                     </View>
@@ -1041,5 +1106,29 @@ const styles = StyleSheet.create({
         color: '#ccc',
         fontSize: 14,
         marginBottom: 8,
+    },
+    progressBarContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    progressBarBackground: {
+        flex: 1,
+        height: 8,
+        backgroundColor: '#333',
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    progressBarFill: {
+        height: '100%',
+        backgroundColor: '#4CAF50',
+        borderRadius: 4,
+    },
+    progressText: {
+        color: '#4CAF50',
+        fontSize: 12,
+        fontWeight: '600',
+        minWidth: 35,
+        textAlign: 'right',
     },
 });

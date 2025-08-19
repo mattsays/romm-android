@@ -1,7 +1,7 @@
 {
-  "name": "romm-android",
+  "name": "romm-mobile",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.0.5.1",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -61,7 +61,8 @@
     "react-native-webview": "13.13.5",
     "react-native-zip-archive": "^7.0.2",
     "react-native-zip-stream": "^1.0.7",
-    "sharp-cli": "^5.2.0"
+    "sharp-cli": "^5.2.0",
+    "expo-dev-client": "~5.2.4"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

@@ -24,6 +24,7 @@ import { useRomDownload } from '../../hooks/useRomDownload';
 import { useRomFileSystem } from '../../hooks/useRomFileSystem';
 import { useTranslation } from '../../hooks/useTranslation';
 import { apiClient, Platform, Rom } from '../../services/api';
+import { SettingsService } from '../../services/settingsService';
 
 const EJS_SUPPORTED_PLATFORMS: string[] = [
     '3do',
@@ -74,9 +75,10 @@ export default function GameDetailsScreen() {
     const [existingFilePath, setExistingFilePath] = useState<string | null>(null);
     const [selectedFileIndex, setSelectedFileIndex] = useState<number>(0);
     const [showVersionSelector, setShowVersionSelector] = useState<boolean>(false);
+    const [emuJsEnabled, setEmuJsEnabled] = useState<boolean>(true);
     const { downloadRom, isDownloading } = useRomDownload();
     const { getDownloadById, completedDownloads, activeDownloads } = useDownload();
-    const { searchPlatformFolder } = usePlatformFolders();
+    const { searchPlatformFolder, requestPlatformFolder } = usePlatformFolders();
     const { isRomDownloaded, isCheckingRom, refreshRomCheck, resetRomsCheck } = useRomFileSystem();
 
     // Ref per tenere traccia dei download completati già processati
@@ -103,6 +105,20 @@ export default function GameDetailsScreen() {
             loadRomDetails();
         }
     }, [id]);
+
+    // Load EmuJS setting on component mount
+    useEffect(() => {
+        const loadEmuJsSetting = async () => {
+            try {
+                const enabled = await SettingsService.getEmuJsEnabled();
+                setEmuJsEnabled(enabled);
+            } catch (error) {
+                console.error('Error loading EmuJS setting:', error);
+                setEmuJsEnabled(true); // Default to enabled
+            }
+        };
+        loadEmuJsSetting();
+    }, []);
 
     // Listen for completed downloads to refresh ROM check
     useEffect(() => {
@@ -145,10 +161,10 @@ export default function GameDetailsScreen() {
             const checkRomStatus = async () => {
                 const platformFolder = await searchPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
                 if (!platformFolder) {
-                    console.error('No platform folder found for:', rom.platform_name);
-                    return;
+                    // Ask for permission to access the platform folder
+                    await requestPlatformFolder({ name: rom.platform_name, slug: rom.platform_slug } as Platform);
                 }
-                await refreshRomCheck(getSelectedFile()!, platformFolder);
+                await refreshRomCheck(getSelectedFile()!, platformFolder!);
                 await updateExistingFilePath(rom);
 
             };
@@ -476,12 +492,12 @@ export default function GameDetailsScreen() {
                                                 <Text style={styles.alreadyDownloadedTitle}>{t('fileAlreadyDownloaded')}</Text>
                                             </View>
                                             <View style={styles.alreadyDownloadedActions}>
-                                                {EJS_SUPPORTED_PLATFORMS.includes(rom?.platform_slug) && <TouchableOpacity
+                                                {EJS_SUPPORTED_PLATFORMS.includes(rom?.platform_slug) && emuJsEnabled && <TouchableOpacity
                                                     style={[styles.downloadButton, styles.openButton]}
                                                     onPress={() => handleOpenWith(rom)}
                                                 >
                                                     <Ionicons name="play-outline" size={20} color="#fff" />
-                                                    <Text style={styles.downloadButtonText}>{t('play')}</Text>
+                                                    <Text style={styles.downloadButtonText}>{t('playOnEmuJS')}</Text>
                                                 </TouchableOpacity>}
                                                 <TouchableOpacity
                                                     style={[styles.downloadButton, styles.redownloadButton]}
@@ -513,13 +529,13 @@ export default function GameDetailsScreen() {
                                         <View style={styles.downloadSection}>
                                             <View style={styles.buttonsRow}>
                                                 {/* Play button for supported platforms */}
-                                                {EJS_SUPPORTED_PLATFORMS.includes(rom?.platform_slug) && (
+                                                {EJS_SUPPORTED_PLATFORMS.includes(rom?.platform_slug) && emuJsEnabled && (
                                                     <TouchableOpacity
                                                         style={[styles.downloadButton, styles.openButton, styles.playButtonHorizontal]}
                                                         onPress={() => handleOpenWith(rom)}
                                                     >
                                                         <Ionicons name="play-outline" size={20} color="#fff" />
-                                                        <Text style={styles.downloadButtonText}>{t('play')}</Text>
+                                                        <Text style={styles.downloadButtonText}>{t('playOnEmuJS')}</Text>
                                                     </TouchableOpacity>
                                                 )}
 
@@ -529,7 +545,7 @@ export default function GameDetailsScreen() {
                                                         styles.downloadButton,
                                                         styles.downloadButtonHorizontal,
                                                         isCurrentlyDownloading && styles.downloadingButton,
-                                                        !EJS_SUPPORTED_PLATFORMS.includes(rom?.platform_slug) && styles.downloadButtonFullWidth
+                                                        !(EJS_SUPPORTED_PLATFORMS.includes(rom?.platform_slug) && emuJsEnabled) && styles.downloadButtonFullWidth
                                                     ]}
                                                     onPress={handleDownload}
                                                     disabled={isCurrentlyDownloading}

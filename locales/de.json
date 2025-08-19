@@ -218,6 +218,7 @@
     "updateCheckFailed": "Update-Prüfung fehlgeschlagen",
     "download": "Herunterladen",
     "play": "Spielen",
+    "playOnEmuJS": "Auf EmuJS spielen",
     "openWith": "Öffnen mit",
     "openWithApp": "Mit App öffnen",
     "errorOpeningFile": "Fehler beim Öffnen der Datei",

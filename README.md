@@ -58,23 +58,28 @@ RomM Mobile is a mobile companion app for [RomM](https://github.com/rommapp/romm
 3. **Open the App**: Launch RomM Mobile and log in with your RomM server credentials
 
 #### iOS (Experimental)
-> **Note**: iOS support is experimental and requires sideloading. Apple Developer Account or jailbreak may be required for some methods.
+> **⚠️ Important**: Due to Expo's architecture, iOS builds are currently only available for development testing. Production IPA files are not yet available for sideloading.
 
-1. **Download the IPA**: Get the latest iOS release from the [Releases page](https://github.com/mattsays/romm-mobile/releases)
-2. **Sideload the IPA**: Use one of the following methods:
-   - **[Sideloadly](https://sideloadly.io/)** (Recommended): Free tool for sideloading IPAs to iOS devices
-   - **[AltStore](https://altstore.io/)**: Alternative sideloading solution
-   - **Xcode**: If you have a Mac and developer account
-3. **Trust the Developer**: Go to Settings → General → VPN & Device Management → Trust the developer certificate
-4. **Open the App**: Launch RomM and log in with your RomM server credentials
+**Development Testing (Recommended)**:
+1. **Prerequisites**: 
+   - macOS computer with Xcode installed
+   - iOS device connected via USB or wireless debugging
+   - Apple Developer account (free account works)
 
-#### Sideloadly Setup (Recommended for iOS)
-1. Download and install [Sideloadly](https://sideloadly.io/) on your computer
-2. Connect your iOS device via USB
-3. Drag the downloaded IPA file into Sideloadly
-4. Enter your Apple ID credentials (free account works)
-5. Click "Start" to install the app
-6. Trust the developer certificate on your device as described above
+2. **Setup and Run**:
+   ```bash
+   git clone https://github.com/mattsays/romm-mobile.git
+   cd romm-mobile
+   expo run:ios --device
+   ```
+
+3. **Device Selection**: Choose your connected iOS device when prompted
+
+4. **Trust Developer**: Go to Settings → General → VPN & Device Management → Trust the developer certificate
+
+5. **Open the App**: Launch RomM Mobile and log in with your RomM server credentials
+
+> **Note**: The app will run in development mode and requires the Expo development server to remain active. Production iOS builds via sideloading (Sideloadly, AltStore) will be available in future releases.
 
 ## 📁 How To - Folder Management
 
@@ -155,7 +160,7 @@ The folder selection dialog shows:
 1. **Clone the repository**
    ```bash
    git clone https://github.com/mattsays/romm-mobile.git
-   cd romm-android
+   cd romm-mobile
    ```
 
 2. **Install dependencies**
@@ -181,7 +186,7 @@ The folder selection dialog shows:
 ### Project Structure
 
 ```
-romm-android/
+romm-mobile/
 ├── app/                    # Expo Router pages
 │   ├── auth/              # Authentication screens
 │   ├── game/              # Game detail screens

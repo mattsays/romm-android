@@ -116,6 +116,7 @@
     "redownload": "Перезагрузить",
     "verify": "Проверить",
     "play": "Играть",
+    "playOnEmuJS": "Играть в EmuJS",
     "confirmDeletion": "Подтвердить удаление",
     "confirmDeleteFile": "Вы уверены, что хотите удалить файл \"{{fileName}}\"?\n\nЭто действие нельзя отменить.",
     "noFileToDelete": "Файл для удаления не найден",

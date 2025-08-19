@@ -118,6 +118,7 @@
     "redownload": "Redownload",
     "verify": "Verify",
     "play": "Play",
+    "playOnEmuJS": "Play on EmuJS",
     "openWith": "Open with",
     "openWithApp": "Open with app",
     "errorOpeningFile": "Error opening file",
